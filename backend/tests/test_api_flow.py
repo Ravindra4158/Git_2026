@@ -39,6 +39,21 @@ class AwaazApiFlowTest(unittest.TestCase):
         verified = verify_fact(report_id, fact_id, FactVerification(verified=True))
         self.assertTrue(verified.extraction.facts[0].verified)
 
+        # Test fact value editing
+        edited_fact = verify_fact(report_id, fact_id, FactVerification(verified=True, value="Yesterday at 3 PM"))
+        self.assertEqual(edited_fact.extraction.facts[0].value, "Yesterday at 3 PM")
+
+        # Test adding timeline event
+        from app.main import add_timeline_event, update_timeline_event, reorder_timeline
+        from app.models import EventCreate, EventUpdate, TimelineReorder
+        tl_report = add_timeline_event(report_id, EventCreate(date_text="Yesterday 3:00 PM", description="Received fake electricity SMS"))
+        self.assertGreaterEqual(len(tl_report.timeline), 1)
+        event_id = tl_report.timeline[-1].id
+
+        # Test editing timeline event
+        tl_updated = update_timeline_event(report_id, event_id, EventUpdate(description="Received fraudulent electricity bill link"))
+        self.assertEqual(tl_updated.timeline[-1].description, "Received fraudulent electricity bill link")
+
         evidence = add_evidence(
             report_id,
             EvidenceCreate(type="message", description="Bank debit message", source="SMS inbox"),
@@ -50,6 +65,10 @@ class AwaazApiFlowTest(unittest.TestCase):
 
         draft = create_draft(report_id, DraftCreate(template_id="financial_incident"))
         self.assertIn("Verified details", draft.content)
+        self.assertIn("[Exhibit A]", draft.content)
+        self.assertIsNotNone(draft.audit)
+        self.assertTrue(draft.audit.is_grounded)
+        self.assertEqual(draft.audit.hallucination_count, 0)
 
         updated = update_draft(
             report_id,

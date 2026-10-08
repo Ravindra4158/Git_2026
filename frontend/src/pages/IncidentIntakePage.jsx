@@ -28,6 +28,7 @@ export default function IncidentIntakePage() {
     setSaving(true);
     try {
       const report = await createReport(story.trim());
+      sessionStorage.setItem("awaaz-active-report-id", report.id);
       navigate(`/reports/${report.id}/analysis`);
     } catch (requestError) {
       setError(requestError.message);
@@ -36,9 +37,26 @@ export default function IncidentIntakePage() {
     }
   }
 
+  const EMERGENCY_KEYWORDS = ["danger", "suicide", "bleeding", "threat", "attack", "kill", "harm", "weapon", "emergency"];
+  const isEmergency = EMERGENCY_KEYWORDS.some((kw) => story.toLowerCase().includes(kw));
+
   return (
     <FlowFrame step={1} title="Describe the incident" description="Start in your own words. You can leave out names and add only what feels useful.">
       <section className="flow-card">
+        {isEmergency && (
+          <div className="emergency-sos-banner" role="alert">
+            <div className="sos-badge">🚨 IMMEDIATE EMERGENCY HELPLINE</div>
+            <p className="sos-text">
+              If you or someone else is in immediate physical danger or experiencing severe distress, please contact emergency responders immediately:
+            </p>
+            <div className="sos-numbers">
+              <span><strong>Police / Emergency:</strong> 112</span>
+              <span><strong>National Cyber Helpline:</strong> 1930</span>
+              <span><strong>Women Helpline:</strong> 1091</span>
+              <span><strong>Tele-MANAS Mental Health:</strong> 14416</span>
+            </div>
+          </div>
+        )}
         <div className="sample-row"><span>TRY A SAMPLE</span>{demoSamples.map(([name, text]) => <button className="sample-button" type="button" key={name} onClick={() => setStory(text)}>＋ {name}</button>)}</div>
         <form onSubmit={submit}>
           <label className="field-label" htmlFor="incident-story">What happened?</label>

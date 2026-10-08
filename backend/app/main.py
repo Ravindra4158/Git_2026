@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.demo_data import DEMO_NARRATIVES
 from app.extraction import ExtractionFailed, ExtractionUnavailable, extract_incident
-from app.drafting import generate_draft
+from app.drafting import audit_draft, generate_draft
 from app.missing_info import find_missing_information
 from app.models import (
     DemoNarrative,
@@ -14,14 +14,18 @@ from app.models import (
     EvidenceItem,
     DraftCreate,
     DraftUpdate,
+    EventCreate,
+    EventUpdate,
     ExtractedFact,
     FactVerification,
     FollowUpAnswer,
+    GroundingAuditResult,
     IncidentEvent,
     RecommendedRoute,
     Report,
     ReportDraft,
     ReportCreate,
+    TimelineReorder,
 )
 from app.routing import recommend_routes
 
@@ -134,7 +138,14 @@ def generate_demo_reports() -> list[Report]:
 
         if not report.drafts and report.extraction is not None:
             template_id = _DEFAULT_TEMPLATES[report.extraction.incident_type.value]
-            draft = ReportDraft(template_id=template_id, content=generate_draft(template_id, report.extraction.facts))
+            content = generate_draft(
+                template_id,
+                report.extraction.facts,
+                evidence=report.evidence,
+                events=report.timeline,
+            )
+            audit = audit_draft(content, report.extraction.facts)
+            draft = ReportDraft(template_id=template_id, content=content, audit=audit)
             report.drafts.append(draft)
 
         seeded.append(report)
@@ -166,10 +177,16 @@ def create_draft(report_id: UUID, payload: DraftCreate) -> ReportDraft:
     if report.extraction is None:
         raise HTTPException(status_code=409, detail="Analyze this report before generating a draft")
     try:
-        content = generate_draft(payload.template_id, report.extraction.facts)
+        content = generate_draft(
+            payload.template_id,
+            report.extraction.facts,
+            evidence=report.evidence,
+            events=report.timeline,
+        )
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
-    draft = ReportDraft(template_id=payload.template_id, content=content)
+    audit = audit_draft(content, report.extraction.facts)
+    draft = ReportDraft(template_id=payload.template_id, content=content, audit=audit)
     report.drafts.append(draft)
     return draft
 
@@ -183,7 +200,82 @@ def update_draft(report_id: UUID, draft_id: UUID, payload: DraftUpdate) -> Repor
     if draft is None:
         raise HTTPException(status_code=404, detail="Draft not found")
     draft.content = payload.content
+    if report.extraction:
+        draft.audit = audit_draft(draft.content, report.extraction.facts)
     return draft
+
+
+@app.post("/api/reports/{report_id}/drafts/{draft_id}/audit", response_model=GroundingAuditResult)
+def run_draft_audit(report_id: UUID, draft_id: UUID) -> GroundingAuditResult:
+    report = reports.get(report_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail="Report not found")
+    draft = next((item for item in report.drafts if item.id == draft_id), None)
+    if draft is None:
+        raise HTTPException(status_code=404, detail="Draft not found")
+    facts = report.extraction.facts if report.extraction else []
+    audit = audit_draft(draft.content, facts)
+    draft.audit = audit
+    return audit
+
+
+@app.post("/api/reports/{report_id}/timeline", response_model=Report, status_code=201)
+def add_timeline_event(report_id: UUID, payload: EventCreate) -> Report:
+    report = reports.get(report_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail="Report not found")
+    event = IncidentEvent(
+        date_text=payload.date_text.strip(),
+        description=payload.description.strip(),
+        source_snippet=payload.source_snippet or "Added by user",
+        verified=True,
+    )
+    report.timeline.append(event)
+    return report
+
+
+@app.patch("/api/reports/{report_id}/timeline/{event_id}", response_model=Report)
+def update_timeline_event(report_id: UUID, event_id: UUID, payload: EventUpdate) -> Report:
+    report = reports.get(report_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail="Report not found")
+    event = next((item for item in report.timeline if item.id == event_id), None)
+    if event is None:
+        raise HTTPException(status_code=404, detail="Timeline event not found")
+    if payload.date_text is not None and payload.date_text.strip():
+        event.date_text = payload.date_text.strip()
+    if payload.description is not None and payload.description.strip():
+        event.description = payload.description.strip()
+    if payload.verified is not None:
+        event.verified = payload.verified
+    return report
+
+
+@app.delete("/api/reports/{report_id}/timeline/{event_id}", response_model=Report)
+def delete_timeline_event(report_id: UUID, event_id: UUID) -> Report:
+    report = reports.get(report_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail="Report not found")
+    event = next((item for item in report.timeline if item.id == event_id), None)
+    if event is None:
+        raise HTTPException(status_code=404, detail="Timeline event not found")
+    report.timeline.remove(event)
+    return report
+
+
+@app.put("/api/reports/{report_id}/timeline/reorder", response_model=Report)
+def reorder_timeline(report_id: UUID, payload: TimelineReorder) -> Report:
+    report = reports.get(report_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail="Report not found")
+    by_id = {event.id: event for event in report.timeline}
+    new_timeline = []
+    for event_id in payload.event_ids:
+        if event_id in by_id:
+            new_timeline.append(by_id.pop(event_id))
+    new_timeline.extend(by_id.values())
+    report.timeline = new_timeline
+    return report
 
 
 @app.patch("/api/reports/{report_id}/facts/{fact_id}", response_model=Report)
@@ -197,6 +289,8 @@ def verify_fact(report_id: UUID, fact_id: UUID, payload: FactVerification) -> Re
     fact = next((item for item in report.extraction.facts if item.id == fact_id), None)
     if fact is None:
         raise HTTPException(status_code=404, detail="Fact not found")
+    if payload.value is not None and payload.value.strip():
+        fact.value = payload.value.strip()
     fact.verified = payload.verified
     return report
 

@@ -2,21 +2,37 @@ import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Link, useNavigate } from "../router.jsx";
 
-const allPages = [
+const mainPages = [
   { label: "Home", to: "/", icon: "⌂" },
   { label: "Report an Incident", to: "/report", icon: "🚨" },
-  { label: "Dashboard", to: "/dashboard", icon: "◫" },
+  { label: "Describe & Presets", to: "/report/describe", icon: "✍️" },
+  { label: "Incident Dashboard", to: "/dashboard", icon: "◫" },
+];
+
+const workflowSteps = [
+  { label: "1. Intake & Presets", pathSuffix: null, fallbackTo: "/report/describe", icon: "📝" },
+  { label: "2. AI Fact Extraction", pathSuffix: "analysis", fallbackTo: "/report/describe", icon: "🔍" },
+  { label: "3. Fact Verification & Q&A", pathSuffix: "summary", fallbackTo: "/report/describe", icon: "📋" },
+  { label: "4. Evidence Catalog", pathSuffix: "evidence", fallbackTo: "/report/describe", icon: "📎" },
+  { label: "5. Authority Routing", pathSuffix: "recommendation", fallbackTo: "/report/describe", icon: "⚖️" },
+  { label: "6. Draft Generation", pathSuffix: "draft", fallbackTo: "/report/describe", icon: "📄" },
+  { label: "7. Review & Grounding Audit", pathSuffix: "review", fallbackTo: "/report/describe", icon: "🛡️" },
+  { label: "8. Export, PDF & Copy", pathSuffix: "save", fallbackTo: "/report/describe", icon: "💾" },
 ];
 
 export default function SiteLayout({ children }) {
   const [showLoginNotice, setShowLoginNotice] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [activeReportId, setActiveReportId] = useState(() => {
+    if (typeof window === "undefined") return null;
+    const urlMatch = window.location.pathname.match(/^\/reports\/([^/]+)/);
+    return urlMatch ? decodeURIComponent(urlMatch[1]) : (sessionStorage.getItem("awaaz-active-report-id") || null);
+  });
   const navigate = useNavigate();
 
   useEffect(() => {
     const handleKey = (e) => { if (e.key === "Escape") setMenuOpen(false); };
     window.addEventListener("keydown", handleKey);
-    // Prevent background scroll when drawer is open
     document.body.style.overflow = menuOpen ? "hidden" : "";
     return () => {
       window.removeEventListener("keydown", handleKey);
@@ -24,10 +40,29 @@ export default function SiteLayout({ children }) {
     };
   }, [menuOpen]);
 
+  useEffect(() => {
+    const urlMatch = window.location.pathname.match(/^\/reports\/([^/]+)/);
+    if (urlMatch) {
+      const id = decodeURIComponent(urlMatch[1]);
+      setActiveReportId(id);
+      sessionStorage.setItem("awaaz-active-report-id", id);
+    } else {
+      const stored = sessionStorage.getItem("awaaz-active-report-id");
+      if (stored) setActiveReportId(stored);
+    }
+  }, [window.location.pathname, menuOpen]);
+
   function handleNavClick(to) {
     setMenuOpen(false);
     navigate(to);
   }
+
+  function getStepTarget(step) {
+    if (!step.pathSuffix) return step.fallbackTo;
+    return activeReportId ? `/reports/${activeReportId}/${step.pathSuffix}` : step.fallbackTo;
+  }
+
+  const currentPath = typeof window !== "undefined" ? window.location.pathname : "/";
 
   return (
     <div className="app-shell">
@@ -40,6 +75,7 @@ export default function SiteLayout({ children }) {
           <a href="/#how-it-works">How It Works</a>
           <a href="/#features">Features</a>
           <a href="/#safety">Safety</a>
+          <Link to="/report">New Report</Link>
           <Link to="/dashboard">Dashboard</Link>
           <button type="button" onClick={() => setShowLoginNotice((v) => !v)}>Login</button>
         </nav>
@@ -65,8 +101,7 @@ export default function SiteLayout({ children }) {
         )}
       </header>
 
-      {/* Portal: renders drawer & backdrop directly on document.body so
-          position:fixed is scoped to viewport, not the app-shell container */}
+      {/* Portal: renders drawer & backdrop directly on document.body */}
       {menuOpen && createPortal(
         <>
           <div
@@ -85,31 +120,58 @@ export default function SiteLayout({ children }) {
               >×</button>
             </div>
 
+            {/* Core Pages */}
             <ul className="menu-section-list">
-              <li className="menu-section-label">PAGES</li>
-              {allPages.map(({ label, to, icon }) => (
+              <li className="menu-section-label">PAGES & WORKSPACE</li>
+              {mainPages.map(({ label, to, icon }) => (
                 <li key={to}>
                   <button
                     type="button"
-                    className="menu-page-link"
+                    className={`menu-page-link ${currentPath === to ? "menu-page-link--active" : ""}`}
                     onClick={() => handleNavClick(to)}
                   >
                     <span className="menu-page-icon">{icon}</span>
-                    {label}
+                    <span>{label}</span>
                   </button>
                 </li>
               ))}
             </ul>
 
+            {/* Incident Workflow Pipeline */}
             <ul className="menu-section-list">
-              <li className="menu-section-label">ON THIS PAGE</li>
-              <li><a className="menu-anchor-link" href="/#how-it-works" onClick={() => setMenuOpen(false)}>How It Works</a></li>
-              <li><a className="menu-anchor-link" href="/#features" onClick={() => setMenuOpen(false)}>Features</a></li>
-              <li><a className="menu-anchor-link" href="/#safety" onClick={() => setMenuOpen(false)}>Safety &amp; Trust</a></li>
+              <li className="menu-section-label">
+                INCIDENT PIPELINE
+                {activeReportId && <span className="menu-active-pill">ACTIVE REPORT</span>}
+              </li>
+              {workflowSteps.map((step) => {
+                const target = getStepTarget(step);
+                const isActive = currentPath === target;
+                return (
+                  <li key={step.label}>
+                    <button
+                      type="button"
+                      className={`menu-page-link ${isActive ? "menu-page-link--active" : ""}`}
+                      onClick={() => handleNavClick(target)}
+                      title={!activeReportId && step.pathSuffix ? "Starts new report intake" : ""}
+                    >
+                      <span className="menu-page-icon">{step.icon}</span>
+                      <span>{step.label}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+
+            {/* Anchor sections */}
+            <ul className="menu-section-list">
+              <li className="menu-section-label">DOCUMENTATION &amp; SECTIONS</li>
+              <li><a className="menu-anchor-link" href="/#how-it-works" onClick={() => setMenuOpen(false)}>⚡ How It Works</a></li>
+              <li><a className="menu-anchor-link" href="/#features" onClick={() => setMenuOpen(false)}>🛡️ Features &amp; Guardrails</a></li>
+              <li><a className="menu-anchor-link" href="/#safety" onClick={() => setMenuOpen(false)}>🔒 Safety &amp; Trust</a></li>
             </ul>
 
             <div className="menu-drawer-footer">
-              <span>GIT JAIPUR 2026</span>
+              <span>GIT JAIPUR 2026 · PS04</span>
             </div>
           </nav>
         </>,

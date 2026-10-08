@@ -75,7 +75,13 @@ export default function DashboardPage() {
                 <div><dt>Routes</dt><dd>{report.recommended_routes?.length || 0}</dd></div>
                 <div><dt>Drafts</dt><dd>{report.drafts?.length || 0}</dd></div>
               </dl>
-              <Link className="text-link next-link" to={nextPath(report)}>Open report <span aria-hidden="true">→</span></Link>
+              <Link
+                className="text-link next-link"
+                to={nextPath(report)}
+                onClick={() => sessionStorage.setItem("awaaz-active-report-id", report.id)}
+              >
+                Open report <span aria-hidden="true">→</span>
+              </Link>
             </article>
           ))}
         </section>

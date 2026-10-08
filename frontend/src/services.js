@@ -24,9 +24,9 @@ export const createReport = (narrative) => request("/reports", {
 export const listReports = () => request("/reports");
 export const getReport = (reportId) => request(`/reports/${reportId}`);
 export const analyzeReport = (reportId) => request(`/reports/${reportId}/analyze`, { method: "POST" });
-export const verifyFact = (reportId, factId, verified) => request(`/reports/${reportId}/facts/${factId}`, {
+export const verifyFact = (reportId, factId, verified, value = null) => request(`/reports/${reportId}/facts/${factId}`, {
   method: "PATCH",
-  body: JSON.stringify({ verified }),
+  body: JSON.stringify({ verified, ...(value !== null ? { value } : {}) }),
 });
 export const answerFollowUp = (reportId, field, answer) => request(`/reports/${reportId}/answers/${encodeURIComponent(field)}`, {
   method: "PATCH",
@@ -37,6 +37,22 @@ export const addEvidence = (reportId, item) => request(`/reports/${reportId}/evi
   body: JSON.stringify(item),
 });
 export const removeEvidence = (reportId, evidenceId) => request(`/reports/${reportId}/evidence/${evidenceId}`, { method: "DELETE" });
+export const getTimeline = (reportId) => request(`/reports/${reportId}/timeline`);
+export const addTimelineEvent = (reportId, item) => request(`/reports/${reportId}/timeline`, {
+  method: "POST",
+  body: JSON.stringify(item),
+});
+export const updateTimelineEvent = (reportId, eventId, item) => request(`/reports/${reportId}/timeline/${eventId}`, {
+  method: "PATCH",
+  body: JSON.stringify(item),
+});
+export const deleteTimelineEvent = (reportId, eventId) => request(`/reports/${reportId}/timeline/${eventId}`, {
+  method: "DELETE",
+});
+export const reorderTimeline = (reportId, eventIds) => request(`/reports/${reportId}/timeline/reorder`, {
+  method: "PUT",
+  body: JSON.stringify({ event_ids: eventIds }),
+});
 export const getRoutes = (reportId) => request(`/reports/${reportId}/routes`);
 export const createDraft = (reportId, templateId) => request(`/reports/${reportId}/drafts`, {
   method: "POST",
@@ -45,6 +61,9 @@ export const createDraft = (reportId, templateId) => request(`/reports/${reportI
 export const updateDraft = (reportId, draftId, content) => request(`/reports/${reportId}/drafts/${draftId}`, {
   method: "PATCH",
   body: JSON.stringify({ content }),
+});
+export const auditDraft = (reportId, draftId) => request(`/reports/${reportId}/drafts/${draftId}/audit`, {
+  method: "POST",
 });
 export const getDemoNarratives = () => request("/demo/narratives");
 export const generateDemoReports = () => request("/demo/reports", { method: "POST" });

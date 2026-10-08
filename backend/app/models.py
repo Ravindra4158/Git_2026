@@ -53,10 +53,20 @@ class DraftTemplate(str, Enum):
     WORKPLACE_REPORT = "workplace_report"
 
 
+class GroundingAuditResult(BaseModel):
+    is_grounded: bool
+    grounding_score: float = Field(ge=0.0, le=1.0)
+    hallucination_count: int = 0
+    verified_facts_count: int = 0
+    unsupported_claims: list[str] = Field(default_factory=list)
+    audit_notes: str
+
+
 class ReportDraft(BaseModel):
     id: UUID = Field(default_factory=uuid4)
     template_id: DraftTemplate
     content: str
+    audit: GroundingAuditResult | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -139,8 +149,25 @@ class Report(BaseModel):
     drafts: list[ReportDraft] = Field(default_factory=list)
 
 
+class EventCreate(BaseModel):
+    date_text: str = Field(min_length=1, max_length=100)
+    description: str = Field(min_length=1, max_length=500)
+    source_snippet: str | None = Field(default="Added by user", max_length=1_000)
+
+
+class EventUpdate(BaseModel):
+    date_text: str | None = Field(default=None, min_length=1, max_length=100)
+    description: str | None = Field(default=None, min_length=1, max_length=500)
+    verified: bool | None = None
+
+
+class TimelineReorder(BaseModel):
+    event_ids: list[UUID]
+
+
 class FactVerification(BaseModel):
     verified: bool
+    value: str | None = None
 
 
 class FollowUpAnswer(BaseModel):
