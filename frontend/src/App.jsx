@@ -2,6 +2,7 @@ import React from "react";
 import { RouteView, Router } from "./router.jsx";
 import SiteLayout from "./layout/SiteLayout.jsx";
 import LandingPage from "./pages/LandingPage.jsx";
+import ReportIncidentPage from "./pages/ReportIncidentPage.jsx";
 import IncidentIntakePage from "./pages/IncidentIntakePage.jsx";
 import AnalysisPage from "./pages/AnalysisPage.jsx";
 import SummaryPage from "./pages/SummaryPage.jsx";
@@ -15,7 +16,8 @@ import DashboardPage from "./pages/DashboardPage.jsx";
 export default function App() {
   const routes = [
     { path: "/", component: LandingPage },
-    { path: "/report", component: IncidentIntakePage },
+    { path: "/report", component: ReportIncidentPage },
+    { path: "/report/describe", component: IncidentIntakePage },
     { path: "/reports/:reportId/analysis", component: AnalysisPage },
     { path: "/reports/:reportId/summary", component: SummaryPage },
     { path: "/reports/:reportId/evidence", component: EvidencePage },

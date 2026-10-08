@@ -34,7 +34,7 @@ export default function DraftPage() {
         </select>
         <div className="notice-box"><strong>{report.extraction?.facts.filter((fact) => fact.verified).length || 0} verified facts will be included</strong><p>Unknown details will remain placeholders. Evidence notes are not treated as verified facts.</p></div>
         {error && <p className="form-error" role="alert">{error}</p>}
-        <div className="page-actions"><Link className="text-link" to={`/reports/${reportId}/recommendation`}>← Change route</Link><button className="primary-cta" type="button" disabled={busy || !report.extraction?.facts.some((fact) => fact.verified)} onClick={generate}>{busy ? "Preparing…" : "Generate draft"}<span aria-hidden="true">→</span></button></div>
+        <div className="page-actions"><Link className="text-link" to={`/reports/${reportId}/recommendation`}>← Change authority</Link><button className="primary-cta" type="button" disabled={busy || !report.extraction?.facts.some((fact) => fact.verified)} onClick={generate}>{busy ? "Preparing…" : "Generate draft"}<span aria-hidden="true">→</span></button></div>
       </section>}
     </FlowFrame>
   );

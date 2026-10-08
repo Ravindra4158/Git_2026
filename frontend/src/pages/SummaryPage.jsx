@@ -31,7 +31,7 @@ export default function SummaryPage() {
   }
 
   return (
-    <FlowFrame step={2} title="Review your incident summary" description="Check each extracted detail against your story. Only verified facts can be used in a draft.">
+    <FlowFrame step={3} title="Review your incident summary" description="Check each extracted detail against your story. Only verified facts can be used in a draft.">
       {!report ? <p>Loading your report…</p> : <>
         <section className="flow-card">
           <div className="panel-heading"><div><span className="mini-label">INCIDENT TYPE</span><h2>{report.extraction?.incident_type.replaceAll("_", " ") || "Not analyzed"}</h2></div><span className="count-chip">{report.extraction?.facts.length || 0} details</span></div>
@@ -43,7 +43,7 @@ export default function SummaryPage() {
           {report.missing_information.map((item) => <div className="question-row" key={item.field}><strong>{item.question}</strong><p>{item.reason}</p><div className="answer-controls"><input value={answers[item.field] || ""} onChange={(event) => setAnswers((current) => ({ ...current, [item.field]: event.target.value }))} placeholder="Add a detail, if you know it" maxLength={1000} /><button type="button" disabled={busy === item.field || !(answers[item.field] || "").trim()} onClick={() => answer(item)}>{busy === item.field ? "Saving…" : "Add detail"}</button></div></div>)}
         </section>
         {error && <p className="form-error" role="alert">{error}</p>}
-        <div className="page-actions"><Link className="text-link" to={`/reports/${reportId}/analysis`}>← Back to analysis</Link><button className="primary-cta" type="button" onClick={() => navigate(`/reports/${reportId}/evidence`)}>Continue to evidence notes <span aria-hidden="true">→</span></button></div>
+        <div className="page-actions"><Link className="text-link" to={`/reports/${reportId}/analysis`}>← Back to analysis</Link><Link className="text-link" to={`/reports/${reportId}/evidence`}>Add evidence notes</Link><button className="primary-cta" type="button" onClick={() => navigate(`/reports/${reportId}/recommendation`)}>Continue to authority recommendation <span aria-hidden="true">→</span></button></div>
       </>}
     </FlowFrame>
   );

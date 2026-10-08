@@ -31,7 +31,7 @@ export default function EvidencePage() {
   }
 
   return (
-    <FlowFrame step={3} title="Keep track of evidence" description="Add notes about related material. This demo stores descriptions and references, not uploaded files.">
+    <FlowFrame step={3} title="Keep track of evidence" description="Add optional notes about related material before continuing to authority recommendation.">
       {!report ? <p>Loading your report…</p> : <section className="flow-card">
         <div className="evidence-fields">
           <label>Type<select value={type} onChange={(event) => setType(event.target.value)}><option value="screenshot">Screenshot</option><option value="message">Message</option><option value="document">Document</option><option value="url">Link</option><option value="transaction_reference">Transaction reference</option><option value="photo_video">Photo or video</option><option value="other">Other</option></select></label>
@@ -41,7 +41,7 @@ export default function EvidencePage() {
         <button className="secondary-button" type="button" disabled={!description.trim() || busy} onClick={addItem}>{busy ? "Adding…" : "Add evidence note"}</button>
         {report.evidence.length ? <ul className="evidence-list">{report.evidence.map((item) => <li key={item.id}><span className="evidence-kind">{item.type.replaceAll("_", " ")}</span><span className="evidence-description"><strong>{item.description}</strong>{item.source && <small>{item.source}</small>}</span><button className="remove-button" type="button" onClick={() => deleteItem(item.id)}>Remove</button></li>)}</ul> : <p className="muted-copy">No evidence notes added. You can continue without them.</p>}
         {error && <p className="form-error" role="alert">{error}</p>}
-        <div className="page-actions"><Link className="text-link" to={`/reports/${reportId}/summary`}>← Back to summary</Link><button className="primary-cta" type="button" onClick={() => navigate(`/reports/${reportId}/recommendation`)}>Continue <span aria-hidden="true">→</span></button></div>
+        <div className="page-actions"><Link className="text-link" to={`/reports/${reportId}/summary`}>← Back to summary</Link><button className="primary-cta" type="button" onClick={() => navigate(`/reports/${reportId}/recommendation`)}>Continue to authority recommendation <span aria-hidden="true">→</span></button></div>
       </section>}
     </FlowFrame>
   );

@@ -2,15 +2,15 @@ import React from "react";
 import { Link } from "../router.jsx";
 
 const steps = [
-  ["01", "Report an incident", "Available"],
-  ["02", "Describe the incident", "Available"],
-  ["03", "AI analysis", "Available"],
-  ["04", "Incident summary", "Available"],
-  ["05", "Authority recommendation", "Available"],
-  ["06", "Authority-specific draft", "Available"],
-  ["07", "User review & edit", "Available"],
-  ["08", "Save / download / share", "Coming next"],
-  ["09", "Dashboard", "Coming next"],
+  ["01", "Report incident", "Ready"],
+  ["02", "Describe incident", "Ready"],
+  ["03", "AI analysis", "Ready"],
+  ["04", "Incident summary", "Ready"],
+  ["05", "Authority recommendation", "Ready"],
+  ["06", "Authority-specific draft", "Ready"],
+  ["07", "User review & edit", "Ready"],
+  ["08", "Save / download / share", "Ready"],
+  ["09", "Dashboard", "Ready"],
 ];
 
 export default function LandingPage() {
@@ -46,7 +46,7 @@ export default function LandingPage() {
         </div>
         <ol className="process-grid">
           {steps.map(([number, title, status]) => (
-            <li className={`process-step ${status === "Available" ? "available" : "upcoming"}`} key={number}>
+            <li className="process-step available" key={number}>
               <span className="process-number">{number}</span><strong>{title}</strong><span className="process-status">{status}</span>
             </li>
           ))}
@@ -79,8 +79,8 @@ export default function LandingPage() {
       </section>
 
       <section className="dashboard-preview" id="dashboard" aria-labelledby="dashboard-heading">
-        <div><p className="eyebrow">YOUR REPORTS, IN ONE PLACE</p><h2 id="dashboard-heading">A dashboard is on the way.</h2><p>Accounts and saved report history are not included in this local prototype.</p></div>
-        <span className="coming-soon">COMING NEXT</span>
+        <div><p className="eyebrow">YOUR REPORTS, IN ONE PLACE</p><h2 id="dashboard-heading">Use the local dashboard.</h2><p>Generate demo data, reopen reports, and continue drafts from the current backend session.</p></div>
+        <Link className="primary-cta" to="/dashboard">Open dashboard <span aria-hidden="true">→</span></Link>
       </section>
     </main>
   );

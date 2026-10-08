@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "../router.jsx";
 import FlowFrame from "../components/FlowFrame.jsx";
-import { createReport } from "../services.js";
+import { createReport, getDemoNarratives } from "../services.js";
 
 const samples = [
   ["Online harassment", "For about two weeks, someone has been messaging me on Instagram and threatening to share private photos. After I blocked the first account, another account contacted me. I have saved screenshots."],
@@ -11,9 +11,16 @@ const samples = [
 
 export default function IncidentIntakePage() {
   const [story, setStory] = useState("");
+  const [demoSamples, setDemoSamples] = useState(samples);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    getDemoNarratives()
+      .then((items) => setDemoSamples(items.map((item) => [item.title, item.narrative])))
+      .catch(() => setDemoSamples(samples));
+  }, []);
 
   async function submit(event) {
     event.preventDefault();
@@ -30,9 +37,9 @@ export default function IncidentIntakePage() {
   }
 
   return (
-    <FlowFrame step={0} title="Describe the incident" description="Start in your own words. You can leave out names and add only what feels useful.">
+    <FlowFrame step={1} title="Describe the incident" description="Start in your own words. You can leave out names and add only what feels useful.">
       <section className="flow-card">
-        <div className="sample-row"><span>TRY A SAMPLE</span>{samples.map(([name, text]) => <button className="sample-button" type="button" key={name} onClick={() => setStory(text)}>＋ {name}</button>)}</div>
+        <div className="sample-row"><span>TRY A SAMPLE</span>{demoSamples.map(([name, text]) => <button className="sample-button" type="button" key={name} onClick={() => setStory(text)}>＋ {name}</button>)}</div>
         <form onSubmit={submit}>
           <label className="field-label" htmlFor="incident-story">What happened?</label>
           <textarea id="incident-story" className="story-input" value={story} onChange={(event) => setStory(event.target.value)} maxLength={20000} required placeholder="Tell us what happened, when it happened, and anything you want help organizing." />

@@ -18,8 +18,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 export OPENAI_API_KEY="your-api-key"  # Optional; required only for AI extraction
-uvicorn app.main:app --reload --port 8000
-```
+.venv/bin/uvicorn app.main:app --reload --host 0.0.0.0 --port 8000```
 
 The app uses `gpt-4o-mini` by default for extraction. Set `OPENAI_MODEL` to use another model that supports structured outputs. Without an API key, intake still works and the extraction endpoint reports that AI is not configured.
 

@@ -153,3 +153,10 @@ class FollowUpAnswer(BaseModel):
         if not value:
             raise ValueError("Answer cannot be blank")
         return value
+
+
+class DemoNarrative(BaseModel):
+    key: str
+    title: str
+    category: IncidentType
+    narrative: str

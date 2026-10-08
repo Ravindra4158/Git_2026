@@ -3,10 +3,13 @@ from uuid import UUID
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.demo_data import DEMO_NARRATIVES
 from app.extraction import ExtractionFailed, ExtractionUnavailable, extract_incident
 from app.drafting import generate_draft
 from app.missing_info import find_missing_information
 from app.models import (
+    DemoNarrative,
+    DraftTemplate,
     EvidenceCreate,
     EvidenceItem,
     DraftCreate,
@@ -25,12 +28,34 @@ from app.routing import recommend_routes
 app = FastAPI(title="AWAAZ API", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
+    ],
     allow_methods=["GET", "POST", "PATCH", "DELETE"],
     allow_headers=["Content-Type"],
 )
 
 reports: dict[UUID, Report] = {}
+
+
+_DEFAULT_TEMPLATES = {
+    "cyber_harassment": DraftTemplate.CYBER_INCIDENT,
+    "financial_fraud": DraftTemplate.FINANCIAL_INCIDENT,
+    "workplace_incident": DraftTemplate.WORKPLACE_REPORT,
+    "physical_threat": DraftTemplate.POLICE_REPORT,
+    "other": DraftTemplate.POLICE_REPORT,
+}
+
+
+def _analyze(report: Report) -> Report:
+    report.extraction = extract_incident(report.narrative)
+    report.missing_information = find_missing_information(report.extraction, len(report.evidence))
+    report.timeline = report.extraction.events
+    report.recommended_routes = recommend_routes(report.extraction.incident_type)
+    return report
 
 
 @app.get("/api/health")
@@ -43,6 +68,11 @@ def create_report(payload: ReportCreate) -> Report:
     report = Report(narrative=payload.narrative.strip())
     reports[report.id] = report
     return report
+
+
+@app.get("/api/reports", response_model=list[Report])
+def list_reports() -> list[Report]:
+    return sorted(reports.values(), key=lambda report: report.created_at, reverse=True)
 
 
 @app.get("/api/reports/{report_id}", response_model=Report)
@@ -59,15 +89,57 @@ def analyze_report(report_id: UUID) -> Report:
     if report is None:
         raise HTTPException(status_code=404, detail="Report not found")
     try:
-        report.extraction = extract_incident(report.narrative)
-        report.missing_information = find_missing_information(report.extraction, len(report.evidence))
-        report.timeline = report.extraction.events
-        report.recommended_routes = recommend_routes(report.extraction.incident_type)
+        _analyze(report)
     except ExtractionUnavailable as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
     except ExtractionFailed as error:
         raise HTTPException(status_code=502, detail=str(error)) from error
     return report
+
+
+@app.get("/api/demo/narratives", response_model=list[DemoNarrative])
+def get_demo_narratives() -> list[DemoNarrative]:
+    return [
+        DemoNarrative(
+            key=item["key"],
+            title=item["title"],
+            category=item["category"],
+            narrative=item["narrative"],
+        )
+        for item in DEMO_NARRATIVES
+    ]
+
+
+@app.post("/api/demo/reports", response_model=list[Report], status_code=201)
+def generate_demo_reports() -> list[Report]:
+    seeded: list[Report] = []
+    existing_by_narrative = {report.narrative: report for report in reports.values()}
+
+    for item in DEMO_NARRATIVES:
+        report = existing_by_narrative.get(item["narrative"])
+        if report is None:
+            report = Report(narrative=item["narrative"])
+            reports[report.id] = report
+
+        if not report.evidence:
+            report.evidence.extend(EvidenceItem(**evidence) for evidence in item["evidence"])
+
+        if report.extraction is None:
+            _analyze(report)
+
+        if report.extraction is not None:
+            for fact in report.extraction.facts:
+                fact.verified = True
+            report.missing_information = find_missing_information(report.extraction, len(report.evidence))
+
+        if not report.drafts and report.extraction is not None:
+            template_id = _DEFAULT_TEMPLATES[report.extraction.incident_type.value]
+            draft = ReportDraft(template_id=template_id, content=generate_draft(template_id, report.extraction.facts))
+            report.drafts.append(draft)
+
+        seeded.append(report)
+
+    return seeded
 
 
 @app.get("/api/reports/{report_id}/timeline", response_model=list[IncidentEvent])

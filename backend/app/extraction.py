@@ -1,11 +1,12 @@
 import json
 import os
+import re
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from pydantic import ValidationError
 
-from app.models import IncidentExtraction
+from app.models import ExtractedFact, IncidentEvent, IncidentExtraction, IncidentType
 
 
 class ExtractionUnavailable(Exception):
@@ -64,7 +65,7 @@ _SCHEMA = {
 def extract_incident(narrative: str) -> IncidentExtraction:
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        raise ExtractionUnavailable("Set OPENAI_API_KEY to enable AI extraction.")
+        return _extract_with_local_rules(narrative)
 
     request_body = {
         "model": os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
@@ -135,3 +136,110 @@ def extract_incident(narrative: str) -> IncidentExtraction:
         and (event.date_text.casefold() == "unknown" or event.date_text in event.source_snippet)
     ]
     return candidate
+
+
+def _sentences(narrative: str) -> list[str]:
+    parts = re.split(r"(?<=[.!?])\s+", narrative.strip())
+    return [part.strip() for part in parts if part.strip()]
+
+
+def _source_for(narrative: str, terms: tuple[str, ...]) -> str:
+    folded_terms = tuple(term.casefold() for term in terms)
+    for sentence in _sentences(narrative):
+        if any(term in sentence.casefold() for term in folded_terms):
+            return sentence
+    return narrative.strip()[:500] or "No source text provided"
+
+
+def _add_fact(facts: list[ExtractedFact], field: str, value: str, source: str) -> None:
+    value = " ".join(value.split())
+    source = " ".join(source.split())
+    if value and source and not any(item.field == field and item.value == value for item in facts):
+        facts.append(ExtractedFact(field=field, value=value[:500], source_snippet=source[:1_000]))
+
+
+def _extract_when(narrative: str) -> str | None:
+    days = "Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday"
+    months = "January|February|March|April|May|June|July|August|September|October|November|December"
+    patterns = (
+        r"\bfor about [^.!,;]+",
+        r"\byesterday(?:\s+\w+)?",
+        r"\blast night\b",
+        r"\blast week\b",
+        rf"\bon\s+(?:{days}|{months})(?:\s+\d{{1,2}})?",
+        r"\bat\s+\d{1,2}(?::\d{2})?\s*(?:am|pm|AM|PM)?",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, narrative, re.IGNORECASE)
+        if match:
+            return match.group(0)
+    return None
+
+
+def _classify(narrative: str) -> IncidentType:
+    text = narrative.casefold()
+    if any(term in text for term in ("upi", "bank", "payment", "transaction", "money", "bill", "pin")):
+        return IncidentType.FINANCIAL_FRAUD
+    if any(term in text for term in ("supervisor", "workplace", "office", "manager", "performance review")) or re.search(r"\bhr\b", text):
+        return IncidentType.WORKPLACE_INCIDENT
+    if any(term in text for term in ("instagram", "whatsapp", "online", "message", "account", "screenshot", "photos", "link")):
+        return IncidentType.CYBER_HARASSMENT
+    if any(term in text for term in ("threatened", "threat", "hit", "followed", "unsafe", "hurt")):
+        return IncidentType.PHYSICAL_THREAT
+    return IncidentType.OTHER
+
+
+def _extract_with_local_rules(narrative: str) -> IncidentExtraction:
+    incident_type = _classify(narrative)
+    facts: list[ExtractedFact] = []
+
+    when = _extract_when(narrative)
+    if when:
+        _add_fact(facts, "when", when, _source_for(narrative, (when,)))
+
+    platform_terms = (
+        ("Instagram", "instagram"),
+        ("WhatsApp", "whatsapp"),
+        ("UPI", "upi"),
+        ("payment link", "payment link"),
+        ("bank", "bank"),
+    )
+    for label, term in platform_terms:
+        if term in narrative.casefold():
+            _add_fact(facts, "platform", label, _source_for(narrative, (term,)))
+            break
+
+    amount = re.search(r"(?:₹|Rs\.?\s*)\s?\d[\d,]*(?:\.\d{1,2})?", narrative)
+    if amount:
+        _add_fact(facts, "amount", amount.group(0), _source_for(narrative, (amount.group(0),)))
+
+    transaction = re.search(r"\b(?:UTR|reference|transaction)\s*(?:id|number|ref)?[:\s-]*[A-Z0-9-]{4,}\b", narrative, re.IGNORECASE)
+    if transaction:
+        _add_fact(facts, "transaction", transaction.group(0), _source_for(narrative, (transaction.group(0),)))
+
+    if any(term in narrative.casefold() for term in ("screenshot", "screenshots", "bank message", "receipt", "document")):
+        _add_fact(facts, "evidence", "Evidence mentioned", _source_for(narrative, ("screenshot", "bank message", "receipt", "document")))
+
+    if "supervisor" in narrative.casefold():
+        _add_fact(facts, "people", "Supervisor", _source_for(narrative, ("supervisor",)))
+    elif "account" in narrative.casefold():
+        _add_fact(facts, "people", "Online account", _source_for(narrative, ("account",)))
+
+    if any(term in narrative.casefold() for term in ("threat", "threatening", "afraid", "unsafe", "performance review")):
+        _add_fact(facts, "impact", "Concern or pressure reported", _source_for(narrative, ("threat", "afraid", "unsafe", "performance review")))
+
+    if not facts:
+        _add_fact(facts, "summary", narrative.strip()[:160], narrative.strip()[:500])
+
+    events = [
+        IncidentEvent(
+            date_text=when or "unknown",
+            description=sentence[:500],
+            source_snippet=sentence[:1_000],
+        )
+        for sentence in _sentences(narrative)[:4]
+    ]
+    if not events:
+        events.append(IncidentEvent(date_text="unknown", description="Incident described", source_snippet=narrative[:1_000]))
+
+    return IncidentExtraction(incident_type=incident_type, facts=facts, events=events)

@@ -26,11 +26,11 @@ export default function AnalysisPage() {
   }
 
   return (
-    <FlowFrame step={1} title="AI analysis" description="AWAAZ will organize details from your story and show the source text for each fact.">
+    <FlowFrame step={2} title="AI analysis" description="AWAAZ will organize details from your story and show the source text for each fact.">
       <section className="flow-card">
         {loading ? <p>Loading your report…</p> : <>
           <div className="story-preview"><span>YOUR STORY</span><p>{report?.narrative}</p></div>
-          <div className="notice-box"><strong>Before you continue</strong><p>When you choose analysis, this story is sent to the AI provider configured for this demo. Use synthetic stories for demonstrations. The AI may make mistakes.</p></div>
+          <div className="notice-box"><strong>Before you continue</strong><p>When you choose analysis, AWAAZ organizes this story through the configured backend. Use synthetic stories for demonstrations. Analysis can make mistakes.</p></div>
           {error && <p className="form-error" role="alert">{error}</p>}
           <div className="page-actions"><Link className="text-link" to="/">← Exit to AWAAZ home</Link><button className="primary-cta" type="button" disabled={busy} onClick={runAnalysis}>{busy ? "Analyzing…" : "Analyze my story"}<span aria-hidden="true">→</span></button></div>
         </>}

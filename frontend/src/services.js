@@ -21,6 +21,7 @@ export const createReport = (narrative) => request("/reports", {
   body: JSON.stringify({ narrative }),
 });
 
+export const listReports = () => request("/reports");
 export const getReport = (reportId) => request(`/reports/${reportId}`);
 export const analyzeReport = (reportId) => request(`/reports/${reportId}/analyze`, { method: "POST" });
 export const verifyFact = (reportId, factId, verified) => request(`/reports/${reportId}/facts/${factId}`, {
@@ -45,3 +46,5 @@ export const updateDraft = (reportId, draftId, content) => request(`/reports/${r
   method: "PATCH",
   body: JSON.stringify({ content }),
 });
+export const getDemoNarratives = () => request("/demo/narratives");
+export const generateDemoReports = () => request("/demo/reports", { method: "POST" });

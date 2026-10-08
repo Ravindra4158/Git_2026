@@ -36,12 +36,12 @@ export default function RecommendationPage() {
   }
 
   return (
-    <FlowFrame step={4} title="Consider a reporting route" description="These general suggestions are based on the incident category. Check current official information for your location.">
+    <FlowFrame step={4} title="Authority recommendation" description="These general suggestions are based on the incident category. Check current official information for your location.">
       {!report ? <p>{error || "Loading recommendations…"}</p> : <>
         <div className="notice-box"><strong>Guidance, not a determination</strong><p>AWAAZ cannot decide jurisdiction or provide legal advice. You choose whether to use any suggestion.</p></div>
         <ul className="route-list route-options">{routes.map((route) => <li className={selected === route.name ? "route-selected" : ""} key={route.name}><label><input type="radio" name="route" checked={selected === route.name} onChange={() => setSelected(route.name)} /><span><strong>{route.name}</strong>{route.primary && <em>Suggested starting point</em>}</span></label><p>{route.reason}</p><small>{route.caveat}</small></li>)}</ul>
         {error && <p className="form-error" role="alert">{error}</p>}
-        <div className="page-actions"><Link className="text-link" to={`/reports/${reportId}/evidence`}>← Back to evidence</Link><button className="primary-cta" type="button" disabled={!selected} onClick={continueToDraft}>Continue to draft <span aria-hidden="true">→</span></button></div>
+        <div className="page-actions"><Link className="text-link" to={`/reports/${reportId}/summary`}>← Back to summary</Link><button className="primary-cta" type="button" disabled={!selected} onClick={continueToDraft}>Continue to draft <span aria-hidden="true">→</span></button></div>
       </>}
     </FlowFrame>
   );
