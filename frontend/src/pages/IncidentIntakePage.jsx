@@ -1,6 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "../router.jsx";
 import FlowFrame from "../components/FlowFrame.jsx";
+import VoiceInput from "../components/VoiceInput.jsx";
+import EmergencyNumbers from "../components/EmergencyNumbers.jsx";
 import { createReport, getDemoNarratives } from "../services.js";
 
 const samples = [
@@ -14,6 +16,8 @@ export default function IncidentIntakePage() {
   const [demoSamples, setDemoSamples] = useState(samples);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [charCount, setCharCount] = useState(0);
+  const textareaRef = useRef(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -21,6 +25,21 @@ export default function IncidentIntakePage() {
       .then((items) => setDemoSamples(items.map((item) => [item.title, item.narrative])))
       .catch(() => setDemoSamples(samples));
   }, []);
+
+  useEffect(() => setCharCount(story.length), [story]);
+
+  function handleStoryChange(e) {
+    setStory(e.target.value);
+  }
+
+  // Voice input appends to existing text
+  function handleVoiceTranscript(transcript) {
+    setStory((prev) => {
+      const joined = prev ? prev.trimEnd() + " " + transcript : transcript;
+      return joined;
+    });
+    textareaRef.current?.focus();
+  }
 
   async function submit(event) {
     event.preventDefault();
@@ -37,33 +56,88 @@ export default function IncidentIntakePage() {
     }
   }
 
-  const EMERGENCY_KEYWORDS = ["danger", "suicide", "bleeding", "threat", "attack", "kill", "harm", "weapon", "emergency"];
+  const EMERGENCY_KEYWORDS = ["danger", "suicide", "bleeding", "threat", "attack", "kill", "harm", "weapon", "emergency", "assault", "rape", "stalking"];
   const isEmergency = EMERGENCY_KEYWORDS.some((kw) => story.toLowerCase().includes(kw));
 
+  const progressPercent = Math.min((charCount / 500) * 100, 100);
+
   return (
-    <FlowFrame step={1} title="Describe the incident" description="Start in your own words. You can leave out names and add only what feels useful.">
-      <section className="flow-card">
+    <FlowFrame step={1} title="Describe the incident" description="Start in your own words — you can use your voice or type. Leave out names if you prefer.">
+      <section className="flow-card intake-card">
+
+        {/* Emergency Banner */}
         {isEmergency && (
           <div className="emergency-sos-banner" role="alert">
-            <div className="sos-badge">🚨 IMMEDIATE EMERGENCY HELPLINE</div>
-            <p className="sos-text">
-              If you or someone else is in immediate physical danger or experiencing severe distress, please contact emergency responders immediately:
-            </p>
+            <div className="sos-badge">🚨 IMMEDIATE EMERGENCY HELPLINES</div>
             <div className="sos-numbers">
-              <span><strong>Police / Emergency:</strong> 112</span>
-              <span><strong>National Cyber Helpline:</strong> 1930</span>
-              <span><strong>Women Helpline:</strong> 1091</span>
-              <span><strong>Tele-MANAS Mental Health:</strong> 14416</span>
+              <a href="tel:112" className="sos-number-link"><strong>112</strong> Police / Emergency</a>
+              <a href="tel:1930" className="sos-number-link"><strong>1930</strong> Cyber Helpline</a>
+              <a href="tel:1091" className="sos-number-link"><strong>1091</strong> Women Helpline</a>
+              <a href="tel:14416" className="sos-number-link"><strong>14416</strong> Mental Health</a>
             </div>
           </div>
         )}
-        <div className="sample-row"><span>TRY A SAMPLE</span>{demoSamples.map(([name, text]) => <button className="sample-button" type="button" key={name} onClick={() => setStory(text)}>＋ {name}</button>)}</div>
+
+        {/* Sample presets */}
+        <div className="sample-row">
+          <span>TRY A SAMPLE</span>
+          {demoSamples.map(([name, text]) => (
+            <button className="sample-button" type="button" key={name} onClick={() => setStory(text)}>
+              ＋ {name}
+            </button>
+          ))}
+        </div>
+
         <form onSubmit={submit}>
-          <label className="field-label" htmlFor="incident-story">What happened?</label>
-          <textarea id="incident-story" className="story-input" value={story} onChange={(event) => setStory(event.target.value)} maxLength={20000} required placeholder="Tell us what happened, when it happened, and anything you want help organizing." />
-          <div className="form-caption"><span>Your story stays in this local session until the backend stops.</span><span>{story.length.toLocaleString()} / 20,000</span></div>
+          {/* Textarea + Voice Input */}
+          <div className="story-input-wrap">
+            <label className="field-label" htmlFor="incident-story">
+              What happened?
+            </label>
+            <div className="story-toolbar">
+              <VoiceInput onTranscript={handleVoiceTranscript} />
+            </div>
+            <textarea
+              id="incident-story"
+              ref={textareaRef}
+              className="story-input"
+              value={story}
+              onChange={handleStoryChange}
+              maxLength={20000}
+              required
+              placeholder="Tell us what happened, when it happened, and anything you want help organizing. You can also tap the 🎤 microphone button above to speak your story."
+            />
+
+            {/* Progress bar */}
+            <div className="story-progress-wrap">
+              <div className="story-progress-bar">
+                <div
+                  className="story-progress-fill"
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
+              <span className="story-char-count">{charCount.toLocaleString()} / 20,000</span>
+            </div>
+          </div>
+
+          <div className="form-caption">
+            <span>Your story stays in this local session until the backend stops.</span>
+          </div>
+
+          {/* Smart emergency numbers based on content */}
+          {story.length > 40 && (
+            <EmergencyNumbers narrative={story} />
+          )}
+
           {error && <p className="form-error" role="alert">{error}</p>}
-          <div className="form-actions"><p>AI analysis is a separate step. You’ll choose when to send the story to the configured AI provider.</p><button className="primary-cta" disabled={!story.trim() || saving}>{saving ? "Starting…" : "Continue to AI analysis"}<span aria-hidden="true">→</span></button></div>
+
+          <div className="form-actions">
+            <p>AI analysis is a separate step. You'll choose when to send the story to the configured AI provider.</p>
+            <button className="primary-cta" disabled={!story.trim() || saving} id="intake-continue-btn">
+              {saving ? "Starting…" : "Continue to AI analysis"}
+              <span aria-hidden="true">→</span>
+            </button>
+          </div>
         </form>
       </section>
     </FlowFrame>

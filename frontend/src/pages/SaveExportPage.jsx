@@ -1,7 +1,17 @@
 import React, { useEffect, useState } from "react";
 import { Link, useParams } from "../router.jsx";
 import FlowFrame from "../components/FlowFrame.jsx";
+import GovtPortalSuggestions from "../components/GovtPortalSuggestions.jsx";
+import EmergencyNumbers from "../components/EmergencyNumbers.jsx";
 import { getReport } from "../services.js";
+
+function incidentToPortalCategory(type = "") {
+  if (/cyber|harassment/.test(type)) return "cyber_harassment";
+  if (/financial|fraud/.test(type)) return "financial_fraud";
+  if (/workplace/.test(type)) return "workplace_incident";
+  if (/physical/.test(type)) return "physical_threat";
+  return "other";
+}
 
 export default function SaveExportPage() {
   const { reportId } = useParams();

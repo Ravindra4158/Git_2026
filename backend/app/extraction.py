@@ -1,8 +1,18 @@
 import json
 import os
 import re
+from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / ".env")
+    load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent.parent / ".env")
+    load_dotenv()
+except ImportError:
+    pass
 
 from pydantic import ValidationError
 
@@ -115,6 +125,9 @@ def extract_incident(narrative: str) -> IncidentExtraction:
         content = api_response["choices"][0]["message"]["content"]
         candidate = IncidentExtraction.model_validate_json(content)
     except HTTPError as error:
+        if error.code == 429:
+            # Fall back to deterministic local rules on quota/rate limit
+            return _extract_with_local_rules(narrative)
         raise ExtractionFailed(f"AI provider returned HTTP {error.code}.") from error
     except (URLError, TimeoutError, KeyError, IndexError, TypeError, json.JSONDecodeError, ValidationError) as error:
         raise ExtractionFailed("AI extraction failed. Please try again.") from error

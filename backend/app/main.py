@@ -1,4 +1,14 @@
+from pathlib import Path
 from uuid import UUID
+
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / ".env")
+    load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent.parent / ".env")
+    load_dotenv()
+except ImportError:
+    pass
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
