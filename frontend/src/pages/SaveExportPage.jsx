@@ -178,6 +178,17 @@ export default function SaveExportPage() {
             </div>
           </div>
 
+          {/* Govt Portals Section */}
+          <div className="no-print" style={{ marginTop: "24px" }}>
+            <EmergencyNumbers
+              forceCategory={incidentToPortalCategory(report?.extraction?.incident_type || "")}
+              compact
+            />
+            <GovtPortalSuggestions
+              category={incidentToPortalCategory(report?.extraction?.incident_type || "")}
+            />
+          </div>
+
           {/* Page Actions */}
           <div className="page-actions no-print">
             <Link className="text-link" to={`/reports/${reportId}/review`}>← Back to review & edit</Link>
