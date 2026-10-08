@@ -33,6 +33,11 @@ function App() {
   const [savingEvidence, setSavingEvidence] = useState(false);
   const [answers, setAnswers] = useState({});
   const [savingAnswer, setSavingAnswer] = useState("");
+  const [draftTemplate, setDraftTemplate] = useState("cyber_incident");
+  const [draft, setDraft] = useState(null);
+  const [savedDraftContent, setSavedDraftContent] = useState("");
+  const [generatingDraft, setGeneratingDraft] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
 
   async function startReport(event) {
     event.preventDefault();
@@ -49,6 +54,8 @@ function App() {
       if (!response.ok) throw new Error(data.detail || "Could not start your report.");
       setReport(data);
       setAnalysis(null);
+      setDraft(null);
+      setSavedDraftContent("");
     } catch {
       setError("Could not reach the API. Start the backend, then try again.");
     } finally {
@@ -153,6 +160,50 @@ function App() {
     }
   }
 
+  async function generateDraft() {
+    if (!report) return;
+    setError("");
+    setGeneratingDraft(true);
+    try {
+      const response = await fetch(`http://localhost:8000/api/reports/${report.id}/drafts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ template_id: draftTemplate }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || "Could not generate this draft.");
+      setDraft(data);
+      setSavedDraftContent(data.content);
+      setReport((previous) => ({ ...previous, drafts: [...(previous?.drafts || []), data] }));
+    } catch (requestError) {
+      setError(requestError.message || "Could not generate this draft.");
+    } finally {
+      setGeneratingDraft(false);
+    }
+  }
+
+  async function saveDraft() {
+    if (!report || !draft) return;
+    setError("");
+    setSavingDraft(true);
+    try {
+      const response = await fetch(`http://localhost:8000/api/reports/${report.id}/drafts/${draft.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: draft.content }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || "Could not save your edits.");
+      setDraft(data);
+      setSavedDraftContent(data.content);
+      setReport((previous) => ({ ...previous, drafts: previous.drafts.map((item) => item.id === data.id ? data : item) }));
+    } catch (requestError) {
+      setError(requestError.message || "Could not save your edits.");
+    } finally {
+      setSavingDraft(false);
+    }
+  }
+
   return (
     <main className="page-shell">
       <nav className="topbar" aria-label="Main navigation">
@@ -180,7 +231,7 @@ function App() {
         <div className="presets" aria-label="Sample stories">
           <span className="presets-label">TRY A SAMPLE</span>
           {presets.map((preset) => (
-            <button className="preset" key={preset.name} type="button" onClick={() => { setNarrative(preset.story); setReport(null); setAnalysis(null); setError(""); }}>
+            <button className="preset" key={preset.name} type="button" onClick={() => { setNarrative(preset.story); setReport(null); setAnalysis(null); setDraft(null); setSavedDraftContent(""); setError(""); }}>
               <span className="preset-icon">＋</span>{preset.name}
             </button>
           ))}
@@ -191,7 +242,7 @@ function App() {
           <textarea
             id="narrative"
             value={narrative}
-            onChange={(event) => { setNarrative(event.target.value); setReport(null); setAnalysis(null); }}
+            onChange={(event) => { setNarrative(event.target.value); setReport(null); setAnalysis(null); setDraft(null); setSavedDraftContent(""); }}
             placeholder="Start wherever feels easiest. What happened? When did it happen? Is there anything you want help organizing?"
             maxLength={20000}
             required
@@ -263,6 +314,71 @@ function App() {
                       ))}
                     </ul>
                   ) : <p className="empty-facts">No suggested details are currently missing.</p>}
+                </section>
+                <section className="analysis-card timeline-card" aria-labelledby="timeline-heading">
+                  <div className="analysis-header">
+                    <div><span className="step-label">TIMELINE <span>FROM YOUR STORY</span></span><h3 id="timeline-heading">Incident timeline</h3></div>
+                    <span className="type-pill">{report.timeline.length} events</span>
+                  </div>
+                  <p className="section-hint">Dates are shown as stated. Unknown dates stay unknown; events stay in story order when the chronology is unclear. Review the sequence.</p>
+                  {report.timeline.length ? (
+                    <ol className="timeline-list">
+                      {report.timeline.map((event) => (
+                        <li key={event.id}>
+                          <span className="timeline-date">{event.date_text.toLowerCase() === "unknown" ? "Date not stated" : event.date_text}</span>
+                          <div className="timeline-event"><strong>{event.description}</strong><blockquote>“{event.source_snippet}”</blockquote><span className="review-tag">Needs review</span></div>
+                        </li>
+                      ))}
+                    </ol>
+                  ) : <p className="empty-facts">No timeline events were extracted from the story.</p>}
+                </section>
+                <section className="analysis-card routes-card" aria-labelledby="routes-heading">
+                  <div className="analysis-header">
+                    <div><span className="step-label">ROUTE GUIDANCE <span>GENERAL</span></span><h3 id="routes-heading">Places you may consider contacting</h3></div>
+                    <span className="type-pill">{report.recommended_routes.length} options</span>
+                  </div>
+                  <p className="section-hint">These are general starting points based on the selected incident category, not legal advice or a jurisdiction decision.</p>
+                  {report.recommended_routes.length ? (
+                    <ul className="route-list">
+                      {report.recommended_routes.map((route) => (
+                        <li key={route.name}>
+                          <div className="route-title"><strong>{route.name}</strong>{route.primary && <span>Suggested starting point</span>}</div>
+                          <p>{route.reason}</p><small>{route.caveat}</small>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : <p className="empty-facts">No route suggestions are available.</p>}
+                </section>
+                <section className="analysis-card draft-card" aria-labelledby="draft-heading">
+                  <div className="analysis-header">
+                    <div><span className="step-label">DRAFT GENERATOR</span><h3 id="draft-heading">Prepare an editable report</h3></div>
+                    <span className="type-pill">{analysis.facts.filter((fact) => fact.verified).length} verified facts</span>
+                  </div>
+                  <p className="section-hint">Only facts you marked verified are included. Unknown details remain placeholders.</p>
+                  <div className="draft-controls">
+                    <label htmlFor="draft-template">Report format</label>
+                    <select id="draft-template" value={draftTemplate} onChange={(event) => setDraftTemplate(event.target.value)}>
+                      <option value="cyber_incident">Cyber incident report</option>
+                      <option value="police_report">Police report</option>
+                      <option value="financial_incident">Financial incident report</option>
+                      <option value="workplace_report">Workplace report</option>
+                    </select>
+                    <button className="analyze-button" type="button" disabled={!analysis.facts.some((fact) => fact.verified) || generatingDraft} onClick={generateDraft}>
+                      {generatingDraft ? "Preparing…" : "Generate draft"}<span aria-hidden="true">→</span>
+                    </button>
+                  </div>
+                  {draft && (
+                    <div className="draft-editor">
+                      <div className="draft-editor-heading"><strong>{draft.template_id.replaceAll("_", " ")} draft</strong><span>Review before use</span></div>
+                      <textarea aria-label="Editable incident report draft" value={draft.content} maxLength={20000} onChange={(event) => setDraft((previous) => ({ ...previous, content: event.target.value }))} />
+                      <div className="draft-save-row">
+                        <span>{draft.content === savedDraftContent ? "All changes saved" : "Unsaved edits"}</span>
+                        <button className="submit-button" type="button" disabled={draft.content === savedDraftContent || savingDraft} onClick={saveDraft}>
+                          {savingDraft ? "Saving…" : "Save edits"}<span aria-hidden="true">✓</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </section>
               </>
             )}

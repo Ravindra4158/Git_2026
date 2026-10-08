@@ -42,8 +42,21 @@ _SCHEMA = {
                 "additionalProperties": False,
             },
         },
+        "events": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "date_text": {"type": "string"},
+                    "description": {"type": "string"},
+                    "source_snippet": {"type": "string"},
+                },
+                "required": ["date_text", "description", "source_snippet"],
+                "additionalProperties": False,
+            },
+        },
     },
-    "required": ["incident_type", "facts"],
+    "required": ["incident_type", "facts", "events"],
     "additionalProperties": False,
 }
 
@@ -65,7 +78,13 @@ def extract_incident(narrative: str) -> IncidentExtraction:
                     "correct, embellish, add advice, or invent details. For each fact, return "
                     "a short value and an exact verbatim source_snippet copied from the story. "
                     "If a detail is unknown or uncertain, omit it. Classify only into the "
-                    "provided incident_type values; use other when unclear."
+                "provided incident_type values; use other when unclear."
+                " Also identify distinct timeline events. Put events in chronological order only "
+                "when the story's time references clearly establish that order; otherwise preserve "
+                "their narrative order. For each event, "
+                "copy its description and source_snippet exactly from the story. Copy any stated "
+                "date or time exactly as written; use the literal 'unknown' when none is stated. "
+                "Do not calculate dates or impose a chronology the story does not support."
                 ),
             },
             {"role": "user", "content": narrative},
@@ -107,5 +126,12 @@ def extract_incident(narrative: str) -> IncidentExtraction:
         if fact.source_snippet in narrative
         and fact.value.casefold() in fact.source_snippet.casefold()
         and fact.source_snippet.casefold() in narrative_folded
+    ]
+    candidate.events = [
+        event
+        for event in candidate.events
+        if event.source_snippet in narrative
+        and event.description in event.source_snippet
+        and (event.date_text.casefold() == "unknown" or event.date_text in event.source_snippet)
     ]
     return candidate

@@ -4,7 +4,7 @@ Hackathon prototype for preparing an incident report draft from a user's own acc
 
 ## Phase 1
 
-Phase 1 provides a simple incident intake screen, three synthetic demo presets, and a FastAPI endpoint that creates an in-memory report. Phase 2 adds optional AI fact extraction with structured output, exact source excerpts, and fact review. Phase 3 adds optional follow-up prompts that accept user answers, plus an evidence notes list. Answers are saved as verified user-provided facts. Evidence notes store descriptions and references only; files are not uploaded. Reports and notes disappear when the backend restarts. Database persistence, report routing, and document export are later work.
+Phase 1 provides a simple incident intake screen, three synthetic demo presets, and a FastAPI endpoint that creates an in-memory report. Phase 2 adds optional AI fact extraction with structured output, exact source excerpts, and fact review. Phase 3 adds optional follow-up prompts that accept user answers, plus an evidence notes list. Phase 4 adds a timeline from quoted events and general category-based route guidance. Phase 5 generates editable report drafts from facts the user has verified. Dates remain in the user's wording; route suggestions are not legal advice. Answers are saved as verified user-provided facts. Evidence notes store descriptions and references only; files are not uploaded. Reports and drafts disappear when the backend restarts. Database persistence and document export remain later work.
 
 ## Run locally
 

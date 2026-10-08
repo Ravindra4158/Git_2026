@@ -4,8 +4,23 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.extraction import ExtractionFailed, ExtractionUnavailable, extract_incident
+from app.drafting import generate_draft
 from app.missing_info import find_missing_information
-from app.models import EvidenceCreate, EvidenceItem, ExtractedFact, FactVerification, FollowUpAnswer, Report, ReportCreate
+from app.models import (
+    EvidenceCreate,
+    EvidenceItem,
+    DraftCreate,
+    DraftUpdate,
+    ExtractedFact,
+    FactVerification,
+    FollowUpAnswer,
+    IncidentEvent,
+    RecommendedRoute,
+    Report,
+    ReportDraft,
+    ReportCreate,
+)
+from app.routing import recommend_routes
 
 app = FastAPI(title="ReportFlow API", version="0.1.0")
 app.add_middleware(
@@ -46,11 +61,57 @@ def analyze_report(report_id: UUID) -> Report:
     try:
         report.extraction = extract_incident(report.narrative)
         report.missing_information = find_missing_information(report.extraction, len(report.evidence))
+        report.timeline = report.extraction.events
+        report.recommended_routes = recommend_routes(report.extraction.incident_type)
     except ExtractionUnavailable as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
     except ExtractionFailed as error:
         raise HTTPException(status_code=502, detail=str(error)) from error
     return report
+
+
+@app.get("/api/reports/{report_id}/timeline", response_model=list[IncidentEvent])
+def get_timeline(report_id: UUID) -> list[IncidentEvent]:
+    report = reports.get(report_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail="Report not found")
+    return report.timeline
+
+
+@app.get("/api/reports/{report_id}/routes", response_model=list[RecommendedRoute])
+def get_routes(report_id: UUID) -> list[RecommendedRoute]:
+    report = reports.get(report_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail="Report not found")
+    return report.recommended_routes
+
+
+@app.post("/api/reports/{report_id}/drafts", response_model=ReportDraft, status_code=201)
+def create_draft(report_id: UUID, payload: DraftCreate) -> ReportDraft:
+    report = reports.get(report_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail="Report not found")
+    if report.extraction is None:
+        raise HTTPException(status_code=409, detail="Analyze this report before generating a draft")
+    try:
+        content = generate_draft(payload.template_id, report.extraction.facts)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    draft = ReportDraft(template_id=payload.template_id, content=content)
+    report.drafts.append(draft)
+    return draft
+
+
+@app.patch("/api/reports/{report_id}/drafts/{draft_id}", response_model=ReportDraft)
+def update_draft(report_id: UUID, draft_id: UUID, payload: DraftUpdate) -> ReportDraft:
+    report = reports.get(report_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail="Report not found")
+    draft = next((item for item in report.drafts if item.id == draft_id), None)
+    if draft is None:
+        raise HTTPException(status_code=404, detail="Draft not found")
+    draft.content = payload.content
+    return draft
 
 
 @app.patch("/api/reports/{report_id}/facts/{fact_id}", response_model=Report)

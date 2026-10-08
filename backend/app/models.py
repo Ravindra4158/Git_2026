@@ -25,9 +25,55 @@ class ExtractedFact(BaseModel):
     verified: bool = False
 
 
+class IncidentEvent(BaseModel):
+    id: UUID = Field(default_factory=uuid4)
+    date_text: str = Field(min_length=1, max_length=100)
+    description: str = Field(min_length=1, max_length=500)
+    source_snippet: str = Field(min_length=1, max_length=1_000)
+    verified: bool = False
+
+
 class IncidentExtraction(BaseModel):
     incident_type: IncidentType
     facts: list[ExtractedFact] = Field(default_factory=list)
+    events: list[IncidentEvent] = Field(default_factory=list)
+
+
+class RecommendedRoute(BaseModel):
+    name: str
+    reason: str
+    caveat: str
+    primary: bool = False
+
+
+class DraftTemplate(str, Enum):
+    CYBER_INCIDENT = "cyber_incident"
+    POLICE_REPORT = "police_report"
+    FINANCIAL_INCIDENT = "financial_incident"
+    WORKPLACE_REPORT = "workplace_report"
+
+
+class ReportDraft(BaseModel):
+    id: UUID = Field(default_factory=uuid4)
+    template_id: DraftTemplate
+    content: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class DraftCreate(BaseModel):
+    template_id: DraftTemplate
+
+
+class DraftUpdate(BaseModel):
+    content: str = Field(min_length=1, max_length=20_000)
+
+    @field_validator("content")
+    @classmethod
+    def content_must_contain_text(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Draft cannot be blank")
+        return value
 
 
 class MissingInformation(BaseModel):
@@ -88,6 +134,9 @@ class Report(BaseModel):
     extraction: IncidentExtraction | None = None
     missing_information: list[MissingInformation] = Field(default_factory=list)
     evidence: list[EvidenceItem] = Field(default_factory=list)
+    timeline: list[IncidentEvent] = Field(default_factory=list)
+    recommended_routes: list[RecommendedRoute] = Field(default_factory=list)
+    drafts: list[ReportDraft] = Field(default_factory=list)
 
 
 class FactVerification(BaseModel):
