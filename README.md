@@ -1,4 +1,4 @@
-# ReportFlow
+# AWAAZ
 
 Hackathon prototype for preparing an incident report draft from a user's own account of events.
 
@@ -7,6 +7,8 @@ Hackathon prototype for preparing an incident report draft from a user's own acc
 Phase 1 provides a simple incident intake screen, three synthetic demo presets, and a FastAPI endpoint that creates an in-memory report. Phase 2 adds optional AI fact extraction with structured output, exact source excerpts, and fact review. Phase 3 adds optional follow-up prompts that accept user answers, plus an evidence notes list. Phase 4 adds a timeline from quoted events and general category-based route guidance. Phase 5 generates editable report drafts from facts the user has verified. Dates remain in the user's wording; route suggestions are not legal advice. Answers are saved as verified user-provided facts. Evidence notes store descriptions and references only; files are not uploaded. Reports and drafts disappear when the backend restarts. Database persistence and document export remain later work.
 
 ## Run locally
+
+The frontend lives in `frontend/src/pages/`, with one file per workflow screen. Shared API requests are in `frontend/src/services.js`; the AWAAZ vector logo is `frontend/public/awaaz-logo.svg`.
 
 Start the backend in one terminal:
 

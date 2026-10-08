@@ -22,7 +22,7 @@ from app.models import (
 )
 from app.routing import recommend_routes
 
-app = FastAPI(title="ReportFlow API", version="0.1.0")
+app = FastAPI(title="AWAAZ API", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],

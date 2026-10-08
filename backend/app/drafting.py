@@ -45,6 +45,6 @@ def generate_draft(template_id: DraftTemplate, facts: list[ExtractedFact]) -> st
         + "\n\nRequested assistance\n"
         "Please record this report and let me know what additional information or next steps "
         "are appropriate.\n\n"
-        "This draft was prepared with ReportFlow. Please review it and replace any remaining "
+        "This draft was prepared with AWAAZ. Please review it and replace any remaining "
         "placeholders before use.\n"
     )
