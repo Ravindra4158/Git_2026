@@ -400,7 +400,7 @@ export default function EvidencePage() {
                 </div>
               </div>
               <p className="muted-copy">
-                Upload a screenshot, photo of a document, or any image containing text. AWAAZ will extract readable text from it using OCR (offline, nothing is uploaded to a server).
+                Upload a screenshot, photo of a document, or any image containing text. AWAAZ performs OCR locally in your browser and never uploads the image to a server.
               </p>
 
               {/* Drop zone */}
