@@ -48,7 +48,7 @@ export default function Sidebar({ className = "", onNavigate }) {
     >
       <div className="space-y-5 overflow-y-auto pr-1">
         <Link to="/" onClick={onNavigate} className="block pt-1 px-2 group">
-          <Logo variant="full" size="md" />
+          <Logo variant="full" size="md" source="/awaaz_brand_logo.svg" />
         </Link>
 
         <div className="space-y-1">

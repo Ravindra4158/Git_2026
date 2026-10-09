@@ -14,6 +14,7 @@ export default function Logo({
   size = "md",
   className = "",
   showTagline = false,
+  source,
 }) {
   const sizeMap = {
     sm: variant === "emblem" ? "h-7 w-7" : "h-7 w-auto",
@@ -24,7 +25,7 @@ export default function Logo({
 
   const selectedSizeClass = sizeMap[size] || size;
 
-  let logoSrc = fullLogo;
+  let logoSrc = source || fullLogo;
   let altText = "Awaaz - When Silence Isn't Safe, Awaaz Is";
 
   if (variant === "emblem") {
