@@ -63,8 +63,8 @@ export default function LandingPage() {
             <div className="relative flex justify-center items-center">
               <div className="relative rounded-2xl overflow-hidden shadow-soft border border-slate-100 w-full max-w-xl group">
                 <img
-                  src="/awaaz_hero_illustration.jpg"
-                  alt="Awaaz - From story to structured report"
+                  src="/awaaz_brand_poster.jpeg"
+                  alt="AWAAZ safety and reporting poster"
                   className="w-full h-auto object-cover rounded-2xl transform group-hover:scale-[1.01] transition-transform duration-300"
                 />
               </div>
