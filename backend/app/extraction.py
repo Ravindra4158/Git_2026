@@ -125,11 +125,14 @@ def extract_incident(narrative: str) -> IncidentExtraction:
         content = api_response["choices"][0]["message"]["content"]
         candidate = IncidentExtraction.model_validate_json(content)
     except HTTPError as error:
-        if error.code == 429:
-            # Fall back to deterministic local rules on quota/rate limit
+        if error.code == 429 or 500 <= error.code <= 599:
+            # Fall back to deterministic local rules on quota/rate limit or provider instability
             return _extract_with_local_rules(narrative)
         raise ExtractionFailed(f"AI provider returned HTTP {error.code}.") from error
-    except (URLError, TimeoutError, KeyError, IndexError, TypeError, json.JSONDecodeError, ValidationError) as error:
+    except (URLError, TimeoutError) as error:
+        # Fall back when internet/provider is unavailable.
+        return _extract_with_local_rules(narrative)
+    except (KeyError, IndexError, TypeError, json.JSONDecodeError, ValidationError) as error:
         raise ExtractionFailed("AI extraction failed. Please try again.") from error
 
     # Keep only claims with an exact source excerpt, and only values found in that excerpt.

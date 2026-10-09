@@ -1,4 +1,6 @@
 import unittest
+from unittest.mock import patch
+from urllib.error import URLError
 
 from app.main import (
     add_evidence,
@@ -100,6 +102,24 @@ class AwaazApiFlowTest(unittest.TestCase):
             self.assertGreater(len(report.recommended_routes), 0)
             self.assertGreater(len(report.drafts), 0)
             self.assertTrue(all(fact.verified for fact in report.extraction.facts))
+
+    def test_analysis_falls_back_to_local_rules_when_network_is_unavailable(self) -> None:
+        created = create_report(
+            ReportCreate(
+                narrative=(
+                    "Last night someone sent me a fake UPI payment request and money was debited. "
+                    "I have screenshots and the bank SMS."
+                )
+            )
+        )
+        report_id = created.id
+
+        with patch.dict("os.environ", {"OPENAI_API_KEY": "demo-key"}, clear=False):
+            with patch("app.extraction.urlopen", side_effect=URLError("offline")):
+                analyzed = analyze_report(report_id)
+
+        self.assertEqual(analyzed.extraction.incident_type.value, "financial_fraud")
+        self.assertGreater(len(analyzed.extraction.facts), 0)
 
 
 if __name__ == "__main__":
