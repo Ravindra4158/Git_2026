@@ -51,4 +51,37 @@ DEMO_NARRATIVES = [
             }
         ],
     },
+    {
+        "key": "physical-threat",
+        "title": "Physical threat",
+        "category": IncidentType.PHYSICAL_THREAT,
+        "narrative": (
+            "A neighbour has been following me near my lane for the last three evenings and threatened to harm me if I complained. "
+            "I noted the time and place and my friend saw one incident."
+        ),
+        "evidence": [
+            {
+                "type": EvidenceType.OTHER,
+                "description": "Friend witnessed the threat near the lane in the evening.",
+                "source": "Witness note",
+            }
+        ],
+    },
+    {
+        "key": "consumer-cyber-scam",
+        "title": "Fake shopping scam",
+        "category": IncidentType.FINANCIAL_FRAUD,
+        "narrative": (
+            "I ordered a phone from a social media seller after paying an advance through UPI. "
+            "The seller stopped responding, deleted the product post, and the courier tracking number appears fake."
+        ),
+        "evidence": [
+            {
+                "type": EvidenceType.TRANSACTION_REFERENCE,
+                "description": "UPI payment reference and seller chat screenshots.",
+                "source": "UPI app and social media chat",
+            }
+        ],
+    },
+
 ]

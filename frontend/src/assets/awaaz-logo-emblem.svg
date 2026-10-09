@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 120" role="img" aria-label="Awaaz Emblem">
+  <defs>
+    <linearGradient id="awaaz-emblem-grad" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#491073"/>
+      <stop offset=".55" stop-color="#bc197e"/>
+      <stop offset="1" stop-color="#ed3d87"/>
+    </linearGradient>
+    <linearGradient id="shield-fill-emblem" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f7d9e9"/>
+      <stop offset="1" stop-color="#fff0e4"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(5 5)">
+    <path d="M54 5 99 22v37c0 31-18 51-45 66C27 110 9 90 9 59V22L54 5Z" fill="url(#shield-fill-emblem)" stroke="url(#awaaz-emblem-grad)" stroke-width="5" stroke-linejoin="round"/>
+    <path d="M43 42c0-9 6-16 14-16 9 0 15 7 15 16 0 7-3 11-7 15l-1 7h11c8 0 14 6 14 14v7H29v-7c0-8 6-14 14-14h9l-1-7c-5-4-8-8-8-15Z" fill="url(#awaaz-emblem-grad)"/>
+    <path d="M34 75h7l4-8 6 17 7-22 6 17 5-8h11" fill="none" stroke="#fff7f4" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

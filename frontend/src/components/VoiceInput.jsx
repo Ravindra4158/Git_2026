@@ -1,6 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Mic, Square } from "lucide-react";
 
-const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+const SpeechRecognition =
+  typeof window !== "undefined"
+    ? window.SpeechRecognition || window.webkitSpeechRecognition
+    : null;
 
 export default function VoiceInput({ onTranscript, language = "en-IN" }) {
   const [listening, setListening] = useState(false);
@@ -21,8 +25,14 @@ export default function VoiceInput({ onTranscript, language = "en-IN" }) {
     recognition.maxAlternatives = 1;
 
     recognition.onstart = () => setListening(true);
-    recognition.onend = () => { setListening(false); setInterimText(""); };
-    recognition.onerror = () => { setListening(false); setInterimText(""); };
+    recognition.onend = () => {
+      setListening(false);
+      setInterimText("");
+    };
+    recognition.onerror = () => {
+      setListening(false);
+      setInterimText("");
+    };
 
     recognition.onresult = (event) => {
       let final = "";
@@ -49,25 +59,33 @@ export default function VoiceInput({ onTranscript, language = "en-IN" }) {
   if (!supported) return null;
 
   return (
-    <div className="voice-input-wrap">
+    <div className="flex flex-col items-start gap-1">
       <button
         type="button"
-        className={`voice-mic-btn${listening ? " voice-mic-btn--active" : ""}`}
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all select-none ${
+          listening
+            ? "bg-rose-50 border-rose-300 text-rose-700 animate-pulse ring-2 ring-rose-200"
+            : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700 hover:text-primary hover:border-primary-border"
+        }`}
         onClick={listening ? stopListening : startListening}
-        title={listening ? "Stop listening (click to stop)" : "Speak your story (click to start)"}
+        title={
+          listening
+            ? "Stop listening (click to stop)"
+            : "Speak your story (click to start)"
+        }
         aria-label={listening ? "Stop voice input" : "Start voice input"}
       >
-        <span className="voice-mic-icon" aria-hidden="true">
-          {listening ? "⏹" : "🎤"}
-        </span>
-        <span className="voice-mic-label">
-          {listening ? "Listening… tap to stop" : "Voice Input"}
-        </span>
-        {listening && <span className="voice-pulse-ring" aria-hidden="true" />}
+        {listening ? (
+          <Square className="w-3.5 h-3.5 fill-rose-600 text-rose-600" />
+        ) : (
+          <Mic className="w-3.5 h-3.5 text-primary" />
+        )}
+        <span>{listening ? "Listening… tap to stop" : "Voice Input"}</span>
       </button>
+
       {interimText && (
-        <p className="voice-interim-text" aria-live="polite">
-          <em>"{interimText}"</em>
+        <p className="text-[11px] text-slate-500 italic bg-white/80 px-2 py-1 rounded border border-slate-100 max-w-sm">
+          "{interimText}"
         </p>
       )}
     </div>

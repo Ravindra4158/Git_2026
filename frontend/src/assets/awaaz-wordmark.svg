@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 430 140" role="img" aria-label="Awaaz Wordmark">
+  <defs>
+    <linearGradient id="wordmark-grad" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#491073"/>
+      <stop offset=".55" stop-color="#bc197e"/>
+      <stop offset="1" stop-color="#ed3d87"/>
+    </linearGradient>
+  </defs>
+  <text x="15" y="77" fill="url(#wordmark-grad)" font-family="system-ui, -apple-system, sans-serif" font-size="68" font-style="italic" font-weight="800" letter-spacing="3">AWAAZ</text>
+  <g fill="url(#wordmark-grad)">
+    <rect x="26" y="96" width="3" height="8" rx="1.5"/><rect x="35" y="92" width="3" height="16" rx="1.5"/>
+    <rect x="44" y="98" width="3" height="5" rx="1.5"/><rect x="53" y="88" width="3" height="23" rx="1.5"/>
+    <rect x="62" y="83" width="3" height="33" rx="1.5"/><rect x="71" y="91" width="3" height="17" rx="1.5"/>
+    <rect x="80" y="96" width="3" height="8" rx="1.5"/>
+  </g>
+  <path d="M95 100h46m-35 11h35" fill="none" stroke="#d62d88" stroke-width="1.5" stroke-linecap="round"/>
+  <text x="158" y="104" fill="#481265" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="500" letter-spacing="2">WHEN SILENCE ISN'T SAFE, AWAAZ IS.</text>
+</svg>

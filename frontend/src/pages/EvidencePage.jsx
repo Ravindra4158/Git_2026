@@ -1,316 +1,119 @@
-import React, { useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "../router.jsx";
-import FlowFrame from "../components/FlowFrame.jsx";
-import {
-  addEvidence,
-  addTimelineEvent,
-  deleteTimelineEvent,
-  getReport,
-  removeEvidence,
-  reorderTimeline,
-  updateTimelineEvent,
-} from "../services.js";
+import React, { useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import AppLayout from "../components/layout/AppLayout.jsx";
+import TopBar from "../components/layout/TopBar.jsx";
+import Card from "../components/ui/Card.jsx";
+import Button from "../components/ui/Button.jsx";
+import Stepper from "../components/ui/Stepper.jsx";
+import FileRow from "../components/ui/FileRow.jsx";
+import ChecklistItem from "../components/ui/ChecklistItem.jsx";
+import { Plus, Upload, Loader2, Sparkles, X, CheckCircle2 } from "lucide-react";
+import { getReport, addEvidence, removeEvidence } from "../services.js";
+import { clearActiveReport,
+  getActiveReportId, setActiveReportId, isMissingReportError } from "../reportUtils.js";
+import { createWorker } from "tesseract.js";
 
-async function runOCR(file, onProgress) {
-  try {
-    // Dynamic import of tesseract.js
-    const { createWorker } = await import("tesseract.js");
-    const worker = await createWorker("eng", 1, {
-      logger: (m) => {
-        if (m.status === "recognizing text" && onProgress) {
-          onProgress(Math.round(m.progress * 100));
-        }
-      },
-    });
-    const { data: { text } } = await worker.recognize(file);
-    await worker.terminate();
-    return text.trim();
-  } catch (err) {
-    throw new Error("OCR failed: " + err.message);
-  }
-}
+const DEFAULT_CHECKLIST = [
+  { id: "c1", label: "Screenshots / Images", checked: false },
+  { id: "c2", label: "Links / URLs", checked: false },
+  { id: "c3", label: "Emails / Documents", checked: false },
+  { id: "c4", label: "Other relevant files", checked: false },
+  { id: "c5", label: "Profile URL", checked: false },
+  { id: "c6", label: "Username", checked: false },
+];
 
 export default function EvidencePage() {
-  const { reportId } = useParams();
+  const params = useParams();
   const navigate = useNavigate();
-  const [report, setReport] = useState(null);
-  const [activeTab, setActiveTab] = useState("timeline");
+  const reportId = getActiveReportId(params);
 
-  // Evidence state
-  const [type, setType] = useState("screenshot");
-  const [description, setDescription] = useState("");
-  const [source, setSource] = useState("");
-
-  // OCR state
-  const [ocrFile, setOcrFile] = useState(null);
-  const [ocrPreview, setOcrPreview] = useState(null);
-  const [ocrRunning, setOcrRunning] = useState(false);
-  const [ocrProgress, setOcrProgress] = useState(0);
+  const [files, setFiles] = useState([]);
+  const [checklist, setChecklist] = useState(DEFAULT_CHECKLIST);
+  const [showModal, setShowModal] = useState(false);
+  const [uploadName, setUploadName] = useState("");
+  const [uploadCategory, setUploadCategory] = useState("screenshot");
   const [ocrText, setOcrText] = useState("");
-  const [ocrError, setOcrError] = useState("");
-  const fileInputRef = useRef(null);
-
-  // Timeline new event state
-  const [newDateText, setNewDateText] = useState("");
-  const [newDescription, setNewDescription] = useState("");
-
-  // Timeline editing state
-  const [editingEventId, setEditingEventId] = useState(null);
-  const [editDateText, setEditDateText] = useState("");
-  const [editDescription, setEditDescription] = useState("");
-
-  const [busy, setBusy] = useState(false);
+  const [ocrScanning, setOcrScanning] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    getReport(reportId).then(setReport).catch((e) => setError(e.message));
+    if (!reportId) {
+      setError("Start a report before adding evidence.");
+      return;
+    }
+
+    getReport(reportId)
+      .then((rep) => {
+        setActiveReportId(rep.id);
+        const mapped = (rep.evidence || []).map((e, idx) => ({
+          id: e.id || `ev-${idx}`,
+          name: e.description || `Evidence_${idx + 1}`,
+          meta: `${e.type?.replaceAll("_", " ") || "Evidence"}${e.source ? ` • ${e.source}` : ""}`,
+          status: "Verified",
+          fileType: e.type === "url" ? "link" : e.type === "document" ? "document" : "image",
+        }));
+        setFiles(mapped);
+        setChecklist((items) => items.map((item) => ({
+          ...item,
+          checked: mapped.some((file) => file.meta.toLowerCase().includes(item.label.split(" ")[0].toLowerCase())),
+        })));
+      })
+      .catch((requestError) => {
+        if (isMissingReportError(requestError)) {
+          clearActiveReport(reportId);
+          navigate("/home", { replace: true });
+          return;
+        }
+        setError(requestError.message);
+      });
   }, [reportId]);
 
-  // OCR file selection
-  function handleOcrFileChange(e) {
-    const file = e.target.files[0];
+  // Handle OCR scan with Tesseract.js
+  async function handleFileSelect(event) {
+    const file = event.target.files?.[0];
     if (!file) return;
-    setOcrFile(file);
-    setOcrText("");
-    setOcrError("");
-    setOcrProgress(0);
 
-    // Preview
-    const reader = new FileReader();
-    reader.onload = (ev) => setOcrPreview(ev.target.result);
-    reader.readAsDataURL(file);
-  }
+    setUploadName(file.name);
+    setSelectedImage(URL.createObjectURL(file));
 
-  async function handleRunOCR() {
-    if (!ocrFile) return;
-    setOcrRunning(true);
-    setOcrError("");
-    setOcrText("");
-    try {
-      const text = await runOCR(ocrFile, setOcrProgress);
-      setOcrText(text);
-      // Auto-fill description from OCR
-      if (text && !description) {
-        setDescription(text.slice(0, 490));
-      }
-    } catch (e) {
-      setOcrError(e.message);
-    } finally {
-      setOcrRunning(false);
-    }
-  }
-
-  function useOcrAsDescription() {
-    if (ocrText) setDescription(ocrText.slice(0, 490));
-  }
-
-  // Evidence handlers
-  async function addItem() {
-    if (!description.trim()) return;
-    setBusy(true); setError("");
-    try {
-      setReport(await addEvidence(reportId, { type, description: description.trim(), source: source.trim() || null }));
-      setDescription(""); setSource(""); setOcrText(""); setOcrFile(null); setOcrPreview(null);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    } catch (e) { setError(e.message); }
-    finally { setBusy(false); }
-  }
-
-  async function deleteItem(id) {
-    try { setReport(await removeEvidence(reportId, id)); }
-    catch (e) { setError(e.message); }
-  }
-
-  // Timeline handlers
-  async function handleAddEvent() {
-    if (!newDateText.trim() || !newDescription.trim()) return;
-    setBusy(true); setError("");
-    try {
-      setReport(await addTimelineEvent(reportId, { date_text: newDateText.trim(), description: newDescription.trim() }));
-      setNewDateText("");
-      setNewDescription("");
-    } catch (e) { setError(e.message); }
-    finally { setBusy(false); }
-  }
-
-  function startEditEvent(event) {
-    setEditingEventId(event.id);
-    setEditDateText(event.date_text);
-    setEditDescription(event.description);
-  }
-
-  async function saveEditEvent(eventId) {
-    if (!editDateText.trim() || !editDescription.trim()) return;
-    setBusy(true); setError("");
-    try {
-      setReport(await updateTimelineEvent(reportId, eventId, { date_text: editDateText.trim(), description: editDescription.trim() }));
-      setEditingEventId(null);
-    } catch (e) { setError(e.message); }
-    finally { setBusy(false); }
-  }
-
-  async function handleDeleteEvent(eventId) {
-    setBusy(true); setError("");
-    try {
-      setReport(await deleteTimelineEvent(reportId, eventId));
-    } catch (e) { setError(e.message); }
-    finally { setBusy(false); }
-  }
-
-  async function moveEvent(index, direction) {
-    if (!report?.timeline) return;
-    const targetIndex = index + direction;
-    if (targetIndex < 0 || targetIndex >= report.timeline.length) return;
-    const items = [...report.timeline];
-    const [moved] = items.splice(index, 1);
-    items.splice(targetIndex, 0, moved);
-    const eventIds = items.map((item) => item.id);
-    setBusy(true); setError("");
-    try {
-      setReport(await reorderTimeline(reportId, eventIds));
-    } catch (e) { setError(e.message); }
-    finally { setBusy(false); }
-  }
-
-  const timeline = report?.timeline || [];
-  const evidence = report?.evidence || [];
-
-  return (
-    <FlowFrame step={3} title="Evidence & Chronological Timeline" description="Verify chronological sequence of events and catalog evidence exhibits for official complaint filing.">
-      {!report ? (
-        <p>{error || "Loading your report…"}</p>
-      ) : (
-        <>
-          {/* Navigation Tabs */}
-          <div className="tab-control-bar">
-            <button
-              type="button"
-              className={`tab-btn ${activeTab === "timeline" ? "tab-btn--active" : ""}`}
-              onClick={() => setActiveTab("timeline")}
-              id="tab-timeline"
-            >
-              📅 Chronological Timeline ({timeline.length})
-            </button>
-            <button
-              type="button"
-              className={`tab-btn ${activeTab === "evidence" ? "tab-btn--active" : ""}`}
-              onClick={() => setActiveTab("evidence")}
-              id="tab-evidence"
-            >
-              📎 Evidence Exhibits ({evidence.length})
-            </button>
-            <button
-              type="button"
-              className={`tab-btn ${activeTab === "ocr" ? "tab-btn--active" : ""}`}
-              onClick={() => setActiveTab("ocr")}
-              id="tab-ocr"
-            >
-              🔍 OCR / Image Scan
-            </button>
+    if (file.type.startsWith("image/")) {
+      setOcrScanning(true);
+      try {
+        const worker = await createWorker("eng");
+        const ret = await worker.recognize(file);
+        setOcrText(ret.data.text.trim());
+        await worker.terminate();
+      } catch (err) {
+                No evidence notes added yet.
+            )}
           </div>
 
-          {/* Tab 1: Chronological Timeline */}
-          {activeTab === "timeline" && (
-            <section className="flow-card">
-              <div className="panel-heading">
-                <div>
-                  <span className="mini-label">CHRONOLOGY ENGINE</span>
-                  <h2>Incident Timeline</h2>
-                </div>
-                <span className="count-chip">{timeline.length} milestones</span>
-              </div>
-              <p className="muted-copy">
-                Events are arranged chronologically. You can edit dates, add missing milestones, or reorder entries to ensure legal accuracy.
-              </p>
+          <div className="pt-4 flex justify-end">
+            <Button
+              variant="pill"
+              size="md"
+              showArrow
+              onClick={() => navigate(reportId ? `/reports/${reportId}/recommendation` : "/home")}
+            >
+              Continue to Timeline & Route
+            </Button>
+          </div>
+        </div>
 
-              <div className="timeline-add-box">
-                <div className="evidence-fields">
-                  <label>
-                    Date / Time
-                    <input
-                      value={newDateText}
-                      onChange={(e) => setNewDateText(e.target.value)}
-                      maxLength={100}
-                      placeholder="e.g., Yesterday afternoon, Oct 8"
-                    />
-                  </label>
-                  <label>
-                    What happened?
-                    <input
-                      value={newDescription}
-                      onChange={(e) => setNewDescription(e.target.value)}
-                      maxLength={500}
-                      placeholder="e.g., Received threatening direct message from suspect account"
-                    />
-                  </label>
-                </div>
-                <button
-                  className="secondary-button"
-                  type="button"
-                  disabled={!newDateText.trim() || !newDescription.trim() || busy}
-                  onClick={handleAddEvent}
-                >
-                  {busy ? "Adding…" : "＋ Add Timeline Milestone"}
-                </button>
-              </div>
+        {/* Right: Checklist Card */}
+        <div className="lg:col-span-4">
+          <Card className="p-6 space-y-4 border-slate-100 shadow-card">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900">
+                Evidence Checklist
+              </h3>
+              <span className="text-xs font-semibold text-primary">
+                {verifiedCount} added
+              </span>
+            </div>
 
-              {timeline.length ? (
-                <ul className="interactive-timeline-list">
-                  {timeline.map((event, index) => {
-                    const isEditing = editingEventId === event.id;
-                    return (
-                      <li key={event.id} className="timeline-item-card">
-                        <div className="timeline-item-header">
-                          <span className="timeline-step-badge">#{index + 1}</span>
-                          {!isEditing ? (
-                            <span className="timeline-date-chip">{event.date_text}</span>
-                          ) : (
-                            <input
-                              className="edit-input-field"
-                              value={editDateText}
-                              onChange={(e) => setEditDateText(e.target.value)}
-                              placeholder="Date / Time"
-                            />
-                          )}
-                          <div className="timeline-item-actions">
-                            <button type="button" className="reorder-btn" disabled={index === 0 || busy} onClick={() => moveEvent(index, -1)} title="Move Earlier">▲</button>
-                            <button type="button" className="reorder-btn" disabled={index === timeline.length - 1 || busy} onClick={() => moveEvent(index, 1)} title="Move Later">▼</button>
-                            {!isEditing ? (
-                              <button type="button" className="small-action-btn" onClick={() => startEditEvent(event)}>Edit</button>
-                            ) : (
-                              <button type="button" className="small-action-btn save-btn" onClick={() => saveEditEvent(event.id)}>Save</button>
-                            )}
-                            <button type="button" className="remove-button" onClick={() => handleDeleteEvent(event.id)}>✕</button>
-                          </div>
-                        </div>
-                        {!isEditing ? (
-                          <div className="timeline-item-body">
-                            <p className="timeline-desc">{event.description}</p>
-                            {event.source_snippet && (
-                              <blockquote className="timeline-source">Source: "{event.source_snippet}"</blockquote>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="timeline-item-edit-body">
-                            <textarea
-                              className="edit-textarea-field"
-                              value={editDescription}
-                              onChange={(e) => setEditDescription(e.target.value)}
-                              placeholder="Milestone description"
-                            />
-                            <button type="button" className="text-link" onClick={() => setEditingEventId(null)}>Cancel</button>
-                          </div>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              ) : (
-                <p className="muted-copy">No chronological events extracted yet. You can add milestones above.</p>
-              )}
-            </section>
-          )}
-
+<<<<<<< HEAD
           {/* Tab 2: Evidence Exhibits */}
           {activeTab === "evidence" && (
             <section className="flow-card">
@@ -404,90 +207,142 @@ export default function EvidencePage() {
               </p>
 
               {/* Drop zone */}
+=======
+            {/* Progress bar */}
+            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+>>>>>>> 42cf9ec (final)
               <div
-                className="ocr-dropzone"
-                onClick={() => fileInputRef.current?.click()}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  const file = e.dataTransfer.files[0];
-                  if (file) {
-                    const fakeEvent = { target: { files: [file] } };
-                    handleOcrFileChange(fakeEvent);
-                  }
-                }}
-              >
-                {ocrPreview ? (
-                  <img src={ocrPreview} alt="Selected evidence" className="ocr-preview-img" />
-                ) : (
-                  <>
-                    <span className="ocr-drop-icon">📂</span>
-                    <p>Click to upload or drag &amp; drop an image here</p>
-                    <small>Supports PNG, JPG, JPEG, WEBP, BMP, PDF (first page)</small>
-                  </>
-                )}
-              </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*,.pdf"
-                style={{ display: "none" }}
-                onChange={handleOcrFileChange}
-                id="ocr-file-input"
+                className="h-full bg-primary rounded-full transition-all duration-300"
+                style={{ width: `${progressPercent}%` }}
               />
+            </div>
 
-              {ocrFile && (
-                <div className="ocr-file-info">
-                  <span>📎 {ocrFile.name}</span>
-                  <button type="button" className="primary-cta" onClick={handleRunOCR} disabled={ocrRunning} id="ocr-run-btn">
-                    {ocrRunning ? `Scanning… ${ocrProgress}%` : "🔍 Extract Text from Image"}
-                  </button>
+            <div className="space-y-1 divide-y divide-slate-100">
+              {checklist.map((item) => (
+                <ChecklistItem
+                  key={item.id}
+                  label={item.label}
+                  checked={item.checked}
+                  onToggle={() => handleToggleCheck(item.id)}
+                />
+              ))}
+            </div>
+          </Card>
+        </div>
+      </div>
+
+      {/* Upload & OCR Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+          <Card className="w-full max-w-lg p-6 space-y-4 shadow-modal">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Upload className="w-5 h-5 text-primary" />
+                <h3 className="text-base font-bold text-slate-900">
+                  Upload Evidence & Scan OCR
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowModal(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  Evidence Label / Title
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Threat message screenshot"
+                  value={uploadName}
+                  onChange={(e) => setUploadName(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  Category
+                </label>
+                <select
+                  value={uploadCategory}
+                  onChange={(e) => setUploadCategory(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                >
+                  <option value="screenshot">Screenshot / Image</option>
+                  <option value="message">Message / Chat</option>
+                  <option value="url">Profile Link / URL</option>
+                  <option value="document">PDF / Document</option>
+                  <option value="transaction_reference">Transaction Reference</option>
+                  <option value="photo_video">Photo / Video</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+
+              {/* File upload input */}
+              <div className="border-2 border-dashed border-slate-200 hover:border-primary rounded-xl p-4 text-center cursor-pointer relative bg-slate-50/50">
+                <input
+                  type="file"
+                  accept="image/*,.pdf"
+                  onChange={handleFileSelect}
+                  className="absolute inset-0 opacity-0 cursor-pointer"
+                />
+                <Upload className="w-6 h-6 mx-auto text-slate-400 mb-1" />
+                <p className="text-xs font-medium text-slate-700">
+                  Drop screenshot or browse file
+                </p>
+                <p className="text-[10px] text-slate-400">
+                  PNG, JPG, PDF supported
+                </p>
+              </div>
+
+              {/* OCR Scanning indicator */}
+              {ocrScanning && (
+                <div className="flex items-center gap-2 p-3 bg-primary-lavender/40 text-primary rounded-xl text-xs font-medium animate-pulse">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>AI OCR reading text from image…</span>
                 </div>
               )}
 
-              {ocrRunning && (
-                <div className="ocr-progress-wrap">
-                  <div className="ocr-progress-bar">
-                    <div className="ocr-progress-fill" style={{ width: `${ocrProgress}%` }} />
-                  </div>
-                  <span>{ocrProgress}% complete</span>
-                </div>
-              )}
-
-              {ocrError && <p className="form-error">{ocrError}</p>}
-
+              {/* OCR Result preview */}
               {ocrText && (
-                <div className="ocr-result-box">
-                  <div className="ocr-result-header">
-                    <strong>✅ Extracted Text</strong>
-                    <button type="button" className="small-action-btn save-btn" onClick={useOcrAsDescription}>
-                      Use as Evidence Description →
-                    </button>
+                <div className="space-y-1">
+                  <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
+                    <Sparkles className="w-3.5 h-3.5 text-primary" />
+                    <span>OCR Extracted Text:</span>
+                  </span>
+                  <div className="max-h-24 overflow-y-auto p-2 bg-slate-50 rounded-lg border border-slate-200 text-[11px] text-slate-600 font-mono">
+                    {ocrText}
                   </div>
-                  <pre className="ocr-result-text">{ocrText}</pre>
-                  <p className="muted-copy" style={{ fontSize: "11px" }}>Review and edit before adding as evidence. OCR may not be 100% accurate.</p>
                 </div>
               )}
-            </section>
-          )}
+            </div>
 
-          {error && <p className="form-error" role="alert">{error}</p>}
-          <div className="page-actions">
-            <Link className="text-link" to={`/reports/${reportId}/summary`}>← Back to summary</Link>
-            <button
-              className="primary-cta"
-              type="button"
-              onClick={() => navigate(`/reports/${reportId}/recommendation`)}
-            >
-              Continue to authority recommendation <span aria-hidden="true">→</span>
-            </button>
-          </div>
-        </>
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setShowModal(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={!uploadName.trim()}
+                onClick={handleSaveEvidence}
+              >
+                Add to Evidence
+              </Button>
+            </div>
+          </Card>
+        </div>
       )}
-    </FlowFrame>
+    </AppLayout>
   );
-}
-
-function chrFromIdx(num) {
-  return num <= 26 ? String.fromCharCode(64 + num) : String(num);
 }

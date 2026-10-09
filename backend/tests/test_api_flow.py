@@ -64,10 +64,12 @@ class AwaazApiFlowTest(unittest.TestCase):
 
         routes = get_routes(report_id)
         self.assertTrue(any(route.primary for route in routes))
+        self.assertIn("Bank Fraud Cell", routes[0].name)
 
         draft = create_draft(report_id, DraftCreate(template_id="financial_incident"))
-        self.assertIn("Verified details", draft.content)
-        self.assertIn("[Exhibit A]", draft.content)
+        self.assertIn("FRAUD MONITORING CELL", draft.content)
+        self.assertIn("UNAUTHORIZED ELECTRONIC TRANSACTION", draft.content)
+        self.assertIn("[Annexure A]", draft.content)
         self.assertIsNotNone(draft.audit)
         self.assertTrue(draft.audit.is_grounded)
         self.assertEqual(draft.audit.hallucination_count, 0)
@@ -83,7 +85,7 @@ class AwaazApiFlowTest(unittest.TestCase):
 
     def test_demo_report_generation_is_complete_and_idempotent(self) -> None:
         narratives = get_demo_narratives()
-        self.assertGreaterEqual(len(narratives), 3)
+        self.assertGreaterEqual(len(narratives), 5)
 
         first_reports = generate_demo_reports()
         second_reports = generate_demo_reports()
@@ -93,7 +95,7 @@ class AwaazApiFlowTest(unittest.TestCase):
         self.assertEqual(len(list_reports()), len(first_reports))
         self.assertEqual(
             {report.extraction.incident_type.value for report in second_reports},
-            {"cyber_harassment", "financial_fraud", "workplace_incident"},
+            {"cyber_harassment", "financial_fraud", "workplace_incident", "physical_threat"},
         )
 
         for report in second_reports:
@@ -120,6 +122,15 @@ class AwaazApiFlowTest(unittest.TestCase):
 
         self.assertEqual(analyzed.extraction.incident_type.value, "financial_fraud")
         self.assertGreater(len(analyzed.extraction.facts), 0)
+
+        draft_by_type = {
+            report.extraction.incident_type.value: report.drafts[0].content
+            for report in second_reports
+        }
+        self.assertIn("CYBER CRIME POLICE STATION", draft_by_type["cyber_harassment"])
+        self.assertIn("FRAUD MONITORING CELL", draft_by_type["financial_fraud"])
+        self.assertIn("INTERNAL COMPLAINTS COMMITTEE", draft_by_type["workplace_incident"])
+        self.assertIn("POLICE STATION", draft_by_type["physical_threat"])
 
 
 if __name__ == "__main__":
